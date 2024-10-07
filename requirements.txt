@@ -1,1 +1,9 @@
+# msprime related
+msprime
+tskit
+tqdm
+ete3
 
+# data processing
+pandas
+numpy
