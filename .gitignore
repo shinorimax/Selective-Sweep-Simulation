@@ -1,0 +1,12 @@
+# R project-related files and folders
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+# Exclude Results folder
+Results/
+Images/
+
+# Exclude Python virtual environments
+venv/

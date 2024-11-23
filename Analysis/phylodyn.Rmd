@@ -1,152 +1,137 @@
 ---
-title: "msprime Simulation Analysis"
-output: (dataframes in) txt files
-
-We use our phylodyn package (Palacios, et al.) to analyze simulation data from msprime.
-We adjust which text file is being read in in order to look at the different selection scenarios.
-
+title: "phylodyn analysis of msprime simulations"
+output: html_notebook
 ---
 
-This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+input: text file of newick format outputs form msprime model simulations
+engineering and the different types of ways...
 
-Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
 
 ```{r}
+library (ape)
 library (spam)
 library (usethis)
 library (devtools)
 library (INLA)
-library (ggplot2)
 library (phytools)
 library(devtools)
 library(phylodyn)
 library(knitr)
+library (ggplot2)
+library(stringr)
 ```
 
-
-We choose which file to read in (each file contains simulation data of a different seleciton coefficient)
+parse data from input file
 ```{r}
-file_path <- "~/Documents/DSURP '24/point_five.txt"
-
-## how to account for different file paths on github?
+file_path <- "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/all_scenarios.txt"
 ```
 
-
 ```{r}
-
-content <- readLines(file_path, warn = FALSE)
 split_content <- function(lines) {
   combined <- paste(lines, collapse = "\n")
   paragraphs <- unlist(strsplit(combined, "\n\n"))
   return(paragraphs)
 }
-paragraphs <- split_content(content)
-paragraphs <- Filter(function(p) nchar(trimws(p)) > 0, paragraphs)
-selected_paragraphs <- paragraphs[seq(2, length(paragraphs), by = 2)]
-extract_numbers <- function(paragraph) {
-  numbers <- as.numeric(unlist(regmatches(paragraph, gregexpr("\\b\\d+\\.?\\d*\\b", paragraph))))
-  numbers <- numbers[numbers != 0]
-  return(numbers)
-}
-number_lists <- lapply(selected_paragraphs, extract_numbers)
-```
 
-
-
-take parsed data to 
-```{r}
-# list of f matrices, each entry to the list is a different simulation's f matrix for that type of tree
-m_list <- list ()
-t_list <- list() #next list
-l_list <- list()
-n_list <- list()
-
-#stores the different tree objects
-m_tr_list <- list()
-t_tr_list <- list()
-l_tr_list <- list()
-n_tr_list <- list()
-
-#list of sampling times for each type of tree
-m_times <- list()
-t_times <- list()
-l_times <- list()
-n_times <- list()
-
-num_index = 1
-for (i in seq(1, length(paragraphs), by = 8)) {
+extract_and_remove_newick_trees <- function(strings_list) {
+  num_scenarios = 0
+  num_simulations = 0
+  pattern <- "NEW"
+  extracted_trees <- list()
+  cleaned_strings <- list()
   
-  temp_file <- tempfile(fileext = ".txt")
-  writeLines(paragraphs[[i]], con = temp_file)
-  mut_tr <- read.tree(file=temp_file)
-  mut_fmat <- gen_Fmat(mut_tr,tol=5)
-  m_time <- number_lists [[num_index + 1]]
-  m_times [[num_index]] <- create.weight.mat.hetero(m_time)
-  m_list [[num_index]] = mut_fmat
-  m_tr_list [[num_index]] = mut_tr
-  
-  
-  
-  temp_file <- tempfile(fileext = ".txt")
-  writeLines(paragraphs[[i + 2]], con = temp_file)
-  next_tr <- read.tree(file=temp_file) 
-  next_fmat <- gen_Fmat(next_tr,tol=5)
-  t_time <- number_lists [[num_index + 3]]
-  t_times [[num_index]] <- create.weight.mat.hetero(t_time)
-  t_list [[num_index]] = next_fmat
-  t_tr_list [[num_index]] = next_tr
-  
-  
-  
-  temp_file <- tempfile(fileext = ".txt")
-  writeLines(paragraphs[[i + 4]], con = temp_file)
-  last_tr <- read.tree(file=temp_file) 
-  last_fmat <- gen_Fmat(last_tr,tol=5)
-  l_time <- number_lists [[num_index + 5]]
-  l_times [[num_index]] <- create.weight.mat.hetero(l_time)
-  l_list [[num_index]] = last_fmat
-  l_tr_list [[num_index]] = last_tr
-  
-
-  temp_file <- tempfile(fileext = ".txt")
-  writeLines(paragraphs[[i + 6]], con = temp_file)
-  n_tr <- read.tree(file=temp_file) 
-  n_fmat <- gen_Fmat(n_tr,tol=5)
-  n_time <- number_lists [[num_index + 7 ]]
-  n_times [[num_index]] <- create.weight.mat.hetero(n_time)
-  n_list [[num_index]] = n2_fmat
-  n_tr_list [[num_index]] = n_tr
-  
-  num_index = num_index + 1
-}
-```
-
-creates pairwise dmat
-```{r}
-create_d1_dmat <- function (tree_list) {
-  dmat <- matrix(0, nrow=length(tree_list), ncol=length(tree_list))
-  for (i in 1:length(tree_list)) {
-      for (j in 1:i) {
-          dmat[i,j] <- dist_pairwise(tree_list[[i]], tree_list[[j]], dist.method="l1", weighted=FALSE)
-      }
+  for (string in strings_list) {
+    matches <- str_extract_all(string, pattern)[[1]]
+    
+    if (length(matches) > 0) {
+      extracted_trees <- c(extracted_trees, matches)
+      num_scenarios = num_scenarios + 1
+    } else {
+      cleaned_strings <- c(cleaned_strings, string)
+      num_simulations = num_simulations + 1
+    }
   }
-  return (dmat)
+  cleaned_strings <- Filter(function(p) nchar(trimws(p)) > 0, cleaned_strings)
+  return(list (cleaned_strings = cleaned_strings, num_simulations = num_simulations / 3))
+}
+
+
+content <- readLines(file_path, warn = FALSE)
+paragraphs <- split_content(content)
+result <- extract_and_remove_newick_trees(paragraphs)
+num_simulations = result$num_simulations
+clean <- result$cleaned_strings
+```
+
+lists a and t are lists of lists of tree in each scenario
+each list in a, t are the list of a different selection coeffieienct's trees
+```{r}
+#create lists based on how many trees extracted from each scenario
+a <- list (list(), list(), list())
+t <- list (list(), list (), list()) #each list is a different scenario
+
+by = length (clean) / 3      #need to add num_scenarios here
+
+for (i in seq(1, length (a))){
+  if (i > 1) {
+    start = by * (i-1) + 1
+    end = by*i
+  } else {
+    start = 1 #indices 1 - 1200
+    end = by
+  }
+  k = 1
+  
+  for (j in seq (start, end)){
+    temp_file <- tempfile (fileext = ".txt")
+    writeLines (clean [[j]], con = temp_file)
+    tr = read.tree (file = temp_file)
+    t[[i]][[k]] <- tr
+    fmat <- gen_Fmat (tr, tol = 5)
+    a[[i]][[k]] <- fmat
+    k = k+1
+    unlink(temp_file)
+  }
 }
 ```
 
-
+sort, each list within a, t is a different selection coefficient
+all lists have all trees s, under selection (indices 1 - 300 are first scenario, 301-600 are second scenario, 601- 900 are third scenario)
 ```{r}
-m_d1 <- create_d1_dmat (m_tr_list)
-t_d1 <- create_d1_dmat (t_tr_list)
-l_d1 <- create_d1_dmat (l_tr_list)
-n_d1 <- create_d1_dmat (n_tr_list)
+# 4 different trees extracted, 3 scenarios
+s <- c(list(), list(), list()) #tree under selection
+n <- c(list(), list(), list()) #tree next to it
+l <- c(list(), list(), list()) #last tree
+r <- c(list(), list(), list()) #random tree
+
+chosen_list <- t
+num = 1
+
+for (i in seq (1, length (chosen_list))){
+  this <- chosen_list [[i]]
+  for (j in seq (1, length (this) - 1, by = 4)){
+    s [[num]] <- this [[j]] # s [[1]] represents the tree under selection, 1 - 300 is from the first scenario
+    n [[num]]<- this [[j + 1]]
+    l [[num]]<- this [[j + 2]]
+    r [[num]]<- this [[j + 3]]
+    num = num + 1
+  }
+}
+
+
 ```
+
 
 We will plot histograms of time to the most recent common ancestor (TMRCA)
 ```{r}
+s_tr_list <- s [1:300]
+n_tr_list <- n [1:300]
+l_tr_list <- l [1:300]
+r_tr_list <- r [1:300]
+
 par(mfrow=c(2,2))
 total<-c(0)
-all<-list(m_tr_list,t_tr_list,l_tr_list,n_tr_list)
+all<-list(s_tr_list,n_tr_list,l_tr_list,r_tr_list)
 for (i in 1:4){
 Treelength<-rep(0,length(all[[i]]))
 for (j in 1:length(all[[i]])){
@@ -162,16 +147,33 @@ hist(total[601:900])
 hist(total[901:1200])
 ```
 
-
+find pairwise distances (d1)
 ```{r}
+options <- c("l1", "l2", FALSE, TRUE)
+
+create_dmat <- function (tree_list, type, wbool) {
+  dmat <- matrix(0, nrow=length(tree_list), ncol=length(tree_list))
+  for (i in 1:length(tree_list)) {
+      for (j in 1:i) {
+          dmat[i,j] <- dist_pairwise(tree_list[[i]], tree_list[[j]], dist.method=options[[type]], weighted=options [[wbool]])
+      }
+  }
+  return (dmat)
+}
+
+s_1_d1 <- create_dmat (s[1:300], 1, 3)
+t_1_d1 <- create_dmat (n[1:300], 1, 3)
+l_1_d1 <- create_dmat (l[1:300], 1, 3)
+scenario_one_mat <- rbind (s_1_d1, t_1_d1, l_1_d1)
+```
+
+creates a distance matrix for one scenario
 ```{r}
 plot_dist_mat <- function (dmat) {
   dmat <- dmat
   tmp <- dmat[lower.tri(dmat)]
   dmat <- t(dmat)
   dmat[lower.tri(dmat)] <- tmp
-  
-  
   mds_result <- cmdscale(dmat)
   temp_df <- data.frame(
   X = mds_result[, 1],
@@ -180,172 +182,63 @@ plot_dist_mat <- function (dmat) {
   
   plot (dmat)
 }
+
+dmat <- scenario_one_mat
+tmp <- dmat[lower.tri(dmat)]
+dmat <- t(dmat)
+dmat[lower.tri(dmat)] <- tmp
+mds_result <- cmdscale(dmat)
 ```
-
-
+find average distances
 ```{r}
-plot_dist_mat (m_d1)
-plot_dist_mat (t_d1)
-plot_dist_mat (l_d1)
-plot_dist_mat (n_d1)
-```
+options <- c("l1", "l2", FALSE, TRUE)
 
-
-```{r}
-create_d2_dmat <- function (tree_list) {
-  dmat <- matrix(0, nrow=length(tree_list), ncol=length(tree_list))
-  for (i in 1:length(tree_list)) {
-      for (j in 1:i) {
-          dmat[i,j] <- dist_pairwise(tree_list[[i]], tree_list[[j]], dist.method="l2", weighted=FALSE)
-      }
-  }
-  return (dmat)
-}
-
-m_d2 <- create_d2_dmat (m_tr_list)
-t_d2 <- create_d2_dmat (t_tr_list)
-l_d2 <- create_d2_dmat (l_tr_list)
-n_d2 <- create_d2_dmat (n_tr_list)
-```
-
-
-```{r}
-plot_dist_mat (m_d2)
-plot_dist_mat (t_d2)
-plot_dist_mat (l_d2)
-plot_dist_mat (n_d2)
-```
-
-
-```{r}
-create_d1w_dmat <- function (tree_list) {
-  dmat <- matrix(0, nrow=length(tree_list), ncol=length(tree_list))
-  for (i in 1:length(tree_list)) {
-      for (j in 1:i) {
-          dmat[i,j] <- dist_pairwise(tree_list[[i]], tree_list[[j]], dist.method="l1", weighted=TRUE)
-      }
-  }
-  return (dmat)
-}
-
-
-m_d1w <- create_d1w_dmat (m_tr_list)
-t_d1w <- create_d1w_dmat (t_tr_list)
-l_d1w <- create_d1w_dmat (l_tr_list)
-n_d1w <- create_d1w_dmat (n_tr_list)
-```
-
-
-```{r}
-plot_dist_mat (m_d1w)
-plot_dist_mat (t_d1w)
-plot_dist_mat (l_d1w)
-plot_dist_mat (n_d1w)
-
-```
-
-
-```{r}
-create_d2w_dmat <- function (tree_list) {
-  dmat <- matrix(0, nrow=length(tree_list), ncol=length(tree_list))
-  for (i in 1:length(tree_list)) {
-      for (j in 1:i) {
-          dmat[i,j] <- dist_pairwise(tree_list[[i]], tree_list[[j]], dist.method="l2", weighted=TRUE)
-      }
-  }
-  return (dmat)
-}
-
-
-m_d2w <- create_d2w_dmat (m_tr_list)
-t_d2w <- create_d2w_dmat (t_tr_list)
-l_d2w <- create_d2w_dmat (l_tr_list)
-n_d2w <- create_d2w_dmat (n_tr_list)
-```
-
-
-```{r}
-plot_dist_mat (m_d2w)
-plot_dist_mat (t_d2w)
-plot_dist_mat (l_d2w)
-plot_dist_mat (n_d2w)
-```
-
-Average L1, unweighted distances
-```{r}
 st.err <- function(x) {
     sd(x)/sqrt(length(x))}
 
-find_avg_l1_dist <- function (first_list, second_list){
+find_avg_dist <- function (first_list, second_list, method, w){
   temp <- list ()
   for (i in 1:length (first_list)) {
-    temp [[num_index]] <- dist_pairwise (first_list [[i]], second_list [[i]], dist.method = 'l1', weighted = FALSE)
+    temp [[num_index]] <- dist_pairwise (first_list [[i]], second_list [[i]], dist.method = options [[method]], weighted = options [[w]])
   }
-  return (temp)
+  print (mean (unlist (temp)))
 }
 
-find_avg_l2_dist <- function (first_list, second_list){
-  temp <- list ()
-  for (i in 1:length (first_list)) {
-    temp [[num_index]] <- dist_pairwise (first_list [[i]], second_list [[i]], dist.method = 'l2', weighted = FALSE)
-  }
-  return (temp)
-}
 
-find_avg_l1w_dist <- function (first_list, second_list){
-  temp <- list ()
-  for (i in 1:length (first_list)) {
-    temp [[num_index]] <- dist_pairwise (first_list [[i]], second_list [[i]], dist.method = 'l1', weighted = TRUE)
-  }
-  return (temp)
-}
+#simulation one:
+print ("select & next:")
+find_avg_dist (s[1:300],n[1:300], 1,3)
 
-find_avg_l2w_dist <- function (first_list, second_list){
-  temp <- list ()
-  for (i in 1:length (first_list)) {
-    temp [[num_index]] <- dist_pairwise (first_list [[i]], second_list [[i]], dist.method = 'l2', weighted = TRUE)
-  }
-  return (temp)
-}
+print ("select & last:")
+find_avg_dist (s[1:300], l[1:300], 1, 3 )
+
+print ("two neutrals:")
+find_avg_dist (l[1:300], r[1:300], 1, 3)
 ```
 
 
 ```{r}
-compare_tree_lists <- function (list_one, list_two){
-  #l1 distance
-  
-  print ("average l1 distance")
-  temp = find_avg_l1_dist (list_one, list_two)
-  print (mean (unlist (temp)))
-  
-  print ("average l2 distance")
-  temp = find_avg_l2_dist (list_one, list_two)
-  print (mean (unlist (temp)))
-  
-  print ("average l1w distance")
-  temp = find_avg_l1w_dist (list_one, list_two)
-  print (mean (unlist (temp)))
-  
-  print ("average l2w distance")
-  temp = find_avg_l2w_dist (list_one, list_two)
-  print (mean (unlist (temp)))
-  
-}
-
-
+#simulation one:
 print ("select & next:")
-compare_tree_lists (m_tr_list, t_tr_list)
-
+find_avg_dist (s[1:300],n[1:300], 1,4)
 
 print ("select & last:")
-compare_tree_lists (m_tr_list, l_tr_list)
+find_avg_dist (s[1:300], l[1:300], 1,4)
 
 print ("two neutrals:")
-compare_tree_lists (n_tr_list, l_tr_list)
+find_avg_dist (l[1:300], r[1:300], 1, 4)
 ```
 
-Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
 
-When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+```{r}
+#simulation one:
+print ("select & next:")
+find_avg_dist (s[301:600],n[301:600], 1,4)
 
-The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+print ("select & last:")
+find_avg_dist (s[301:600], l[301:600], 1,4)
+
+print ("two neutrals:")
+find_avg_dist (l[301:600], r[301:600], 1, 4)
+
+```

@@ -3,7 +3,12 @@ msprime
 tskit
 tqdm
 ete3
+daiquiri
 
 # data processing
 pandas
 numpy
+
+# data visualization
+matplotlib
+IPython

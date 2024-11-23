@@ -1,0 +1,399 @@
+---
+title: "phylodyn_renewed"
+output: html_document
+date: "2024-11-10"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Install dependencies
+```{r}
+library (ape)
+library (spam)
+library (usethis)
+library (devtools)
+library (INLA)
+library (phytools)
+library(devtools)
+library(phylodyn)
+library(knitr)
+library (ggplot2)
+library(stringr)
+library(jsonlite)
+library(dplyr)
+library(boot)
+```
+
+Define Function to generate distance matrix
+```{r}
+# Define the function
+generate_distance_matrices <- function(scenarios, dist_method = "l1", weighted = FALSE, trees_per_simulation = 4) {
+  # List to store distance matrices for each selection coefficient scenario
+  distance_matrices <- list()
+  
+  # Iterate over each scenario in the input list
+  for (scenario_idx in seq_along(scenarios)) {
+    # Extract the F matrices list for the current selection scenario
+    scenarios_list <- scenarios[[scenario_idx]]
+    
+    # Calculate the number of simulations per scenario
+    scenario_length <- length(scenarios_list)
+    scenario_num <- scenario_length / trees_per_simulation
+    
+    # Initialize a list to store distance matrices for each simulation in this scenario
+    scenario_dmat_list <- list()
+    
+    # Iterate over each simulation in the scenario
+    for (index in 1:scenario_length) {
+      # Initialize the distance matrix
+      dmat <- matrix(0, nrow = trees_per_simulation, ncol = trees_per_simulation)
+      
+      # Calculate pairwise distances
+      for (i in 1:trees_per_simulation) {
+        for (j in 1:i) {
+          dmat[i, j] <- dist_pairwise(
+            scenarios_list[[index]][[i]], 
+            scenarios_list[[index]][[j]], 
+            dist.method = dist_method, 
+            weighted = weighted
+          )
+        }
+      }
+      
+      # Mirror the lower triangle to the upper triangle
+      tmp <- dmat[lower.tri(dmat)]
+      dmat <- t(dmat)
+      dmat[lower.tri(dmat)] <- tmp
+      
+      # Store the distance matrix for the current simulation
+      scenario_dmat_list[[index]] <- dmat
+    }
+    
+    # Store the distance matrices for the current scenario
+    distance_matrices[[scenario_idx]] <- scenario_dmat_list
+  }
+  
+  # Return the list of distance matrices
+  return(distance_matrices)
+}
+```
+
+Define Visualizing function
+```{r}
+# Define the function
+plot_mds_scenarios <- function(distance_matrices, trees_per_simulation, tree_colors = c("#F8766D", "#7CAE00", "#00BFC4", "#C77CFF")) {
+  # Iterate over each scenario in the distance matrices
+  for (scenario_idx in seq_along(distance_matrices)) {
+    scenario_dmat_list <- distance_matrices[[scenario_idx]]
+    
+    # Prepare a data frame to hold MDS points for all simulations in the scenario
+    plot_data <- data.frame()
+    variance_explained <- c()  # To store variance explained for each dimension
+    
+    for (sim_idx in seq_along(scenario_dmat_list)) {
+      dmat <- scenario_dmat_list[[sim_idx]]
+      
+      # Perform MDS on the distance matrix
+      mds <- cmdscale(dmat, eig=TRUE, k=2)
+      
+      # Calculate the variance explained by each dimension
+      variance_explained <- mds$eig[1:2] / sum(mds$eig) * 100
+      
+      # Create a data frame for this simulation's MDS points
+      sim_data <- data.frame(
+        Dimension1 = mds$points[, 1],
+        Dimension2 = mds$points[, 2],
+        TreeType = factor(paste("Tree", 1:trees_per_simulation)),
+        Simulation = sim_idx
+      )
+      
+      # Combine with overall plot data
+      plot_data <- rbind(plot_data, sim_data)
+    }
+    
+    # Add centroids for each tree type
+    centroids <- plot_data %>%
+      group_by(TreeType) %>%
+      summarize(
+        Centroid1 = mean(Dimension1),
+        Centroid2 = mean(Dimension2)
+      )
+    
+    # Determine symmetric limits based on the max absolute value in plot_data
+    max_limit <- max(abs(c(plot_data$Dimension1, plot_data$Dimension2))) + 10
+    
+    # Create the ggplot for this scenario
+    p <- ggplot(plot_data, aes(x=Dimension1, y=Dimension2, color=TreeType)) +
+      geom_point(size=3, alpha=0.8) +
+      geom_point(data=centroids, aes(x=Centroid1, y=Centroid2, color=TreeType), 
+                 size=4, shape=4, stroke=1.2, inherit.aes=FALSE) +
+      scale_color_manual(values=tree_colors) +
+      coord_fixed(ratio=1, xlim=c(-max_limit, max_limit), ylim=c(-max_limit, max_limit)) +
+      labs(
+        title=paste("MDS Plot - Scenario", scenario_idx),
+        color="Tree Type",
+        x=paste("Dimension 1 (", round(variance_explained[1], 2), "%)", sep=""),
+        y=paste("Dimension 2 (", round(variance_explained[2], 2), "%)", sep="")
+      ) +
+      theme(legend.position="right")
+    
+    # Display the plot
+    print(p)
+  }
+}
+```
+
+Define Calculating average distances
+```{r}
+# Define the function
+calculate_pairwise_stats <- function(distance_matrices, indices = c(1, 2, 3), conf_level = 0.95) {
+  # Check if indices are valid
+  if (any(indices > length(distance_matrices))) {
+    stop("Indices exceed the number of elements in the distance_matrices list.")
+  }
+  
+  # Pairs to report
+  pairs <- list(
+    c(1, 2), c(1, 3), c(1, 4),
+    c(2, 3), c(2, 4),
+    c(3, 4)
+  )
+  
+  # Iterate over specified indices
+  for (index in indices) {
+    # Get the list of matrices for the current index
+    matrices_list <- distance_matrices[[index]]
+    
+    # Number of matrices
+    num_matrices <- length(matrices_list)
+    
+    # Stack matrices for CI computation
+    stacked_values <- array(0, dim = c(4, 4, num_matrices))
+    
+    # Sum each [i, j] element across all matrices
+    for (i in seq_along(matrices_list)) {
+      matrix <- matrices_list[[i]]
+      stacked_values[, , i] <- matrix
+    }
+    
+    # Function to calculate mean for bootstrapping
+    calculate_mean <- function(data, indices) {
+      apply(data[, , indices, drop = FALSE], c(1, 2), mean)
+    }
+    
+    # Bootstrap confidence intervals
+    boot_result <- boot(
+      data = stacked_values,
+      statistic = calculate_mean,
+      R = 1000
+    )
+    
+    # Print results for unique pairs
+    cat("\nResults for [[", index, "]]:\n", sep = "")
+    for (pair in pairs) {
+      i <- pair[1]
+      j <- pair[2]
+      
+      # Average and CI for the pair
+      avg <- mean(stacked_values[i, j, ])
+      ci <- quantile(boot_result$t[, i + (j - 1) * 4], probs = c((1 - conf_level) / 2, 1 - (1 - conf_level) / 2))
+      
+      # Print the results
+      cat(sprintf(
+        "Pair [%d, %d]: Average = %.2f, CI = [%.2f, %.2f]\n",
+        i, j, avg, ci[1], ci[2]
+      ))
+    }
+  }
+}
+```
+
+Load json file and convert them into phylo objects
+```{r}
+library(ape)
+library(jsonlite)
+
+# Load JSON data
+file_name <- "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/results_Ne_1000_L_1000000_samples_25_sweeps.json"
+data <- fromJSON(file_name)
+
+# Convert each scenario into a list of phylo objects
+scenarios <- lapply(names(data), function(scenario_name) {
+  scenario <- data[[scenario_name]]
+  lapply(seq_len(nrow(scenario)), function(row) {
+    lapply(seq_len(ncol(scenario)), function(col) {
+      newick_str <- scenario[row, col]
+      read.tree(text = newick_str)
+    })
+  })
+})
+
+# Accessing the first four trees as an example
+first_tree <- scenarios[[2]][[2]][[1]]
+second_tree <- scenarios[[2]][[2]][[2]]
+third_tree <- scenarios[[2]][[2]][[3]]
+fourth_tree <- scenarios[[2]][[2]][[4]]
+
+# Plot the first four trees with margins and a time scale
+par(mfrow = c(2, 2), mar = c(2, 0.5, 2, 0.5))  # Arrange plots in a 2x2 grid with extra margins
+plot(first_tree, main = "First Tree", edge.width = 2)
+axisPhylo()  # Add a time scale to the x-axis
+plot(second_tree, main = "Second Tree", edge.width = 2)
+axisPhylo()  # Add a time scale to the x-axis
+plot(third_tree, main = "Third Tree", edge.width = 2)
+axisPhylo()  # Add a time scale to the x-axis
+plot(fourth_tree, main = "Fourth Tree", edge.width = 2)
+axisPhylo()  # Add a time scale to the x-axis
+```
+
+Calculate l1 unweighted distances
+```{r}
+# Assuming `scenarios` is your input list and `dist_pairwise` is defined
+distance_matrices_l1_uw <- generate_distance_matrices(scenarios, dist_method = "l1", weighted = FALSE, trees_per_simulation = 4)
+print(distance_matrices_l1_uw[[1]][[1]])
+```
+
+Visualize l1 unweighted distances
+```{r}
+# Assuming distance_matrices_l2_w is the list of distance matrices for your scenarios
+trees_per_simulation <- 4 
+plot_mds_scenarios(distance_matrices_l1_uw, trees_per_simulation)
+```
+
+Get l1 unweighted statistics
+```{r}
+# Assuming `distance_matrices_l2_w` is the list of distance matrices
+calculate_pairwise_stats(distance_matrices_l1_uw)
+```
+
+Calculate l1 weighted distances
+```{r}
+# Assuming `scenarios` is your input list and `dist_pairwise` is defined
+distance_matrices_l1_w <- generate_distance_matrices(scenarios, dist_method = "l1", weighted = TRUE, trees_per_simulation = 4)
+```
+
+Visualize l1 weighted distances
+```{r}
+trees_per_simulation <- 4 
+plot_mds_scenarios(distance_matrices_l1_w, trees_per_simulation)
+```
+
+Get l1 weighted statistics
+```{r}
+# Assuming `distance_matrices_l2_w` is the list of distance matrices
+calculate_pairwise_stats(distance_matrices_l1_w)
+```
+
+Calculate l2 unweighted distances
+```{r}
+distance_matrices_l2_uw <- generate_distance_matrices(scenarios, dist_method = "l2", weighted = FALSE, trees_per_simulation = 4)
+```
+
+Visualize l2 unweighted distances
+```{r}
+trees_per_simulation <- 4 
+plot_mds_scenarios(distance_matrices_l2_uw, trees_per_simulation)
+```
+
+Get l2 unweighted statistics
+```{r}
+# Assuming `distance_matrices_l2_w` is the list of distance matrices
+calculate_pairwise_stats(distance_matrices_l2_uw)
+```
+
+Calculate l2 weighted distances
+```{r}
+# Assuming `scenarios` is your input list and `dist_pairwise` is defined
+distance_matrices_l2_w <- generate_distance_matrices(scenarios, dist_method = "l2", weighted = TRUE, trees_per_simulation = 4)
+```
+
+Visualize l2 weighted distances
+```{r}
+# Assuming distance_matrices_l2_w is the list of distance matrices for your scenarios
+trees_per_simulation <- 4 
+plot_mds_scenarios(distance_matrices_l2_w, trees_per_simulation)
+```
+
+Get l2 weighted statistics
+```{r}
+# Assuming `distance_matrices_l2_w` is the list of distance matrices
+calculate_pairwise_stats(distance_matrices_l2_w)
+```
+
+Compute F matrices for each simulated Trees.
+```{r}
+# # Assuming gen_Fmat() is already defined and available in your environment
+# # And assuming `scenarios` is the list of phylo objects generated from the previous step
+# 
+# Fmat_lists <- list()
+# 
+# # Loop over each selection scenario and apply gen_Fmat to each tree in the scenario
+# for (scenario_idx in seq_along(scenarios)) {
+#   # Extract the current scenario's list of phylo objects
+#   scenario <- scenarios[[scenario_idx]]
+#   
+#   # Initialize a list to store F matrices for each simulation within the scenario
+#   scenario_Fmat_list <- list()
+#   
+#   # Loop over each simulation within the scenario
+#   for (sim_idx in seq_along(scenario)) {
+#     # Apply gen_Fmat to each tree in the simulation
+#     trees <- scenario[[sim_idx]]
+#     Fmat_list <- lapply(trees, gen_Fmat)
+#     
+#     # Store the F matrices list for this simulation
+#     scenario_Fmat_list[[sim_idx]] <- Fmat_list
+#   }
+#   
+#   # Store the F matrices for the entire scenario
+#   Fmat_lists[[scenario_idx]] <- scenario_Fmat_list
+# }
+# 
+# # Print the first F matrix for verification
+# # print(Fmat_lists[[1]][[1]][[1]])
+```
+
+Now try running a classification algorithm
+```{r}
+# Create an empty data frame to store results
+all_distances <- data.frame(
+  distance = numeric(),
+  pair_type = character()
+)
+
+# Focus only on Scenario 2
+scenario_idx <- 2  # Specify the scenario index (Scenario 2)
+scenario_matrices <- distance_matrices_l1_uw[[scenario_idx]]  # Retrieve matrices for Scenario 2
+
+# Iterate over all matrices in Scenario 2
+for (matrix_idx in seq_along(scenario_matrices)) {
+  distance_matrix <- scenario_matrices[[matrix_idx]]  # Current distance matrix
+  
+  # Flatten only the upper triangular part (excluding diagonal)
+  for (i in 1:4) {
+    for (j in (i + 1):4) {  # Start j from i + 1 to avoid diagonal and duplicates
+      # Determine pair type
+      pair_type <- if (i <= 2 && j <= 2) {
+        "selected-selected"
+      } else if (i > 2 && j > 2) {
+        "neutral-neutral"
+      } else {
+        "selected-neutral"
+      }
+      
+      # Append to the data frame
+      all_distances <- rbind(
+        all_distances,
+        data.frame(distance = distance_matrix[i, j], pair_type = pair_type)
+      )
+    }
+  }
+}
+
+# Check the structure of the resulting data
+head(all_distances)
+```
+
+
