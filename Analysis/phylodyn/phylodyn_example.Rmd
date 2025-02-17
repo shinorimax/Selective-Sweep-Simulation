@@ -20,7 +20,8 @@ install.packages("htmltools")
 install.packages("spatstat.utils")
 install.packages("rgdal")
 install.packages("stars")
-install_github("https://github.com/carlos-alberto-silva/weblidar-treetop", dependencies = TRUE)
+install.packages("Luminescence")
+# install_github("https://github.com/carlos-alberto-silva/weblidar-treetop", dependencies = TRUE)
 ```
 
 This vignette demonstrates generation of F-matrices and a distance matrix between ranked tree shapes. We start with a simple example with $n=5$.
@@ -123,11 +124,11 @@ for (i in 1:n_tr) {
     }
 }
 # ==== d_{CP-RTS} ==== 
-cp.dmat <- matrix(0, nrow=n_tr, ncol=n_tr)
-tmp <- treetop::vecMultiDistUnlab(tr_list)
-cp.dmat[lower.tri(cp.dmat)] <- tmp
-cp.dmat <- t(cp.dmat)
-cp.dmat[lower.tri(cp.dmat)] <- tmp
+#cp.dmat <- matrix(0, nrow=n_tr, ncol=n_tr)
+#tmp <- treetop::vecMultiDistUnlab(tr_list)
+#cp.dmat[lower.tri(cp.dmat)] <- tmp
+#cp.dmat <- t(cp.dmat)
+#cp.dmat[lower.tri(cp.dmat)] <- tmp
 # ==== d_{RF-RTS} ==== 
 rf.dmat <- matrix(0, nrow=n_tr, ncol=n_tr)
 tmp <- phangorn::RF.dist(tr_list_lab, normalize=FALSE, 
@@ -137,17 +138,17 @@ rf.dmat[lower.tri(rf.dmat)] <- tmp
 rf.dmat <- t(rf.dmat)
 rf.dmat[lower.tri(rf.dmat)] <- tmp
 # ==== d_{KC-RTS} ==== 
-kc1.dmat <- matrix(0, nrow=n_tr, ncol=n_tr)
-tmp <- treespace::multiDist(tr_list_lab, lambda=0)
-kc1.dmat[lower.tri(kc1.dmat)] <- tmp
-kc1.dmat <- t(kc1.dmat)
-kc1.dmat[lower.tri(kc1.dmat)] <- tmp
+#kc1.dmat <- matrix(0, nrow=n_tr, ncol=n_tr)
+#tmp <- treespace::multiDist(tr_list_lab, lambda=0)
+#kc1.dmat[lower.tri(kc1.dmat)] <- tmp
+#kc1.dmat <- t(kc1.dmat)
+#kc1.dmat[lower.tri(kc1.dmat)] <- tmp
 # ==== d_{KC-RTS*} ==== 
-kc2.dmat <- matrix(0, nrow=n_tr, ncol=n_tr)
-tmp <- treespace::multiDist(tr_list_lab, lambda=0.5)
-kc2.dmat[lower.tri(kc2.dmat)] <- tmp
-kc2.dmat <- t(kc2.dmat)
-kc2.dmat[lower.tri(kc2.dmat)] <- tmp
+#kc2.dmat <- matrix(0, nrow=n_tr, ncol=n_tr)
+#tmp <- treespace::multiDist(tr_list_lab, lambda=0.5)
+#kc2.dmat[lower.tri(kc2.dmat)] <- tmp
+#kc2.dmat <- t(kc2.dmat)
+#kc2.dmat[lower.tri(kc2.dmat)] <- tmp
 # ==== d_{BHV-RTS} ==== 
 bhv.dmat <- matrix(0, nrow=n_tr, ncol=n_tr)
 tmp <- distory::dist.multiPhylo(tr_list_lab)
@@ -199,17 +200,20 @@ bhv2.dmat[lower.tri(bhv2.dmat)] <- tmp.vec
 
 Print distance matrices of all distance functions computed.
 ```{r, include=TRUE, echo=FALSE, message=FALSE, warning=FALSE}
-dmat.list <- list(d1.dmat, d2.dmat, cp.dmat, rf.dmat,
-                  kc1.dmat, kc2.dmat, bhv.dmat, bhv2.dmat)
-names(dmat.list) <- c('d_1', 'd_2', 'd_{CP-RTS}', 'd_{RF-RTS}',
-                      'd_{KC-RTS}', 'd_{KC-RTS*}', 'd_{BHV-RTS}',
+dmat.list <- list(d1.dmat, d2.dmat, rf.dmat, bhv.dmat, bhv2.dmat)
+names(dmat.list) <- c('d_1', 'd_2', 'd_{RF-RTS}', 'd_{BHV-RTS}',
                       'd_{BHV-RTS*}')
 print(lapply(dmat.list, round, digits=2))
 ```
 
 We now simulate 10 trees with n=50 tips from 5 different Beta-splitting distributions. The random trees are generated using the code by Maliet 2018. We compute the pairwaise L1 distance matrix of 50 by 50 and plot the MDS of the distance matrix:
 
+```{r}
+install.packages("ape")
+```
+
 ```{r, include=TRUE, results="hide", message=FALSE, warning=FALSE}
+library(apTreeshape)
 rand.seed <- 56
 treetypes <- c("balanced", "yule", "ab", "pda", "unbalanced")
 n.sim <- 10 # number of simulations

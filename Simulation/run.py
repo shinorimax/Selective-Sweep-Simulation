@@ -20,7 +20,7 @@ def extract_trees(sim, indices):
     """Extract trees at specific indices and return Newick format strings."""
     return [sim.at_index(idx).as_newick() for idx in indices]
 
-def get_file_path(Ne, L, num_samples, folder="results"):
+def get_file_path(Ne, L, num_samples, folder="Results"):
     """Generate a dynamic file name for the output JSON file."""
     file_name = f"results_Ne_{Ne}_L_{L}_samples_{num_samples}.json"
     os.makedirs(folder, exist_ok=True)
@@ -187,30 +187,33 @@ def get_file_path_multiple_sweeps(Ne, L, num_samples, folder="results"):
 
 # Example usage
 if __name__ == "__main__":
-    selection_scenario = [0.01, 0.5, 1.0]
-    Ne = int(1e3)
-    L = int(1e6)
+    selection_scenario = [0.001, 0.01, 0.1]
+    Ne = int(1e4)
+    L = int(1e5)
     num_samples = 25
     num_simulations = 300
-    num_sweeps = 3
+    num_sweeps = 1
+    recombination_rate = 1.25 * 1e-8
     log_setting = [(1, 0), (1, 1), (1, 2)]
     
-    output_file = simulate_multiple_sweeps(
+    # output_file = simulate_multiple_sweeps(
+    #     selection_scenario=selection_scenario,
+    #     Ne=Ne,
+    #     L=L,
+    #     num_samples=num_samples,
+    #     num_simulations=num_simulations,
+    #     num_sweeps=num_sweeps,
+    #     recombination_rate=recombination_rate,
+    #     # log_simulations=log_setting
+    # )
+    # print(f"Results saved to {output_file}")
+    
+    output_file = run_simple_simulations(
         selection_scenario=selection_scenario,
         Ne=Ne,
         L=L,
         num_samples=num_samples,
         num_simulations=num_simulations,
-        num_sweeps=num_sweeps,
-        log_simulations=log_setting
+        recombination_rate=recombination_rate
     )
     print(f"Results saved to {output_file}")
-    
-    # output_file = run_simple_simulations(
-    #     selection_scenario=selection_scenario,
-    #     Ne=Ne,
-    #     L=L,
-    #     num_samples=num_samples,
-    #     num_simulations=num_simulations
-    # )
-    # print(f"Results saved to {output_file}")

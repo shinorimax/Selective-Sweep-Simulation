@@ -122,15 +122,19 @@ plot_mds_scenarios <- function(distance_matrices, trees_per_simulation, tree_col
       )
     
     # Determine symmetric limits based on the max absolute value in plot_data
-    max_limit <- max(abs(c(plot_data$Dimension1, plot_data$Dimension2))) + 10
+    # max_limit <- max(abs(c(plot_data$Dimension1, plot_data$Dimension2))) + 10
+    x_limits <- quantile(plot_data$Dimension1, probs = c(0.005, 0.995), na.rm = TRUE)
+    y_limits <- quantile(plot_data$Dimension2, probs = c(0.005, 0.995), na.rm = TRUE)
+    x_range <- range(x_limits)
+    y_range <- range(y_limits)
     
     # Create the ggplot for this scenario
     p <- ggplot(plot_data, aes(x=Dimension1, y=Dimension2, color=TreeType)) +
-      geom_point(size=3, alpha=0.8) +
+      geom_point(size=1, alpha=0.8) +
       geom_point(data=centroids, aes(x=Centroid1, y=Centroid2, color=TreeType), 
-                 size=4, shape=4, stroke=1.2, inherit.aes=FALSE) +
+                 size=5, shape=17, stroke=1.2, inherit.aes=FALSE) +
       scale_color_manual(values=tree_colors) +
-      coord_fixed(ratio=1, xlim=c(-max_limit, max_limit), ylim=c(-max_limit, max_limit)) +
+      coord_fixed(ratio=1, xlim=x_range, ylim=y_range) +
       labs(
         title=paste("MDS Plot - Scenario", scenario_idx),
         color="Tree Type",
@@ -216,7 +220,7 @@ library(ape)
 library(jsonlite)
 
 # Load JSON data
-file_name <- "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/results_Ne_1000_L_1000000_samples_25_sweeps.json"
+file_name <- "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/results_Ne_10000_L_100000_samples_25.json"
 data <- fromJSON(file_name)
 
 # Convert each scenario into a list of phylo objects
@@ -231,10 +235,10 @@ scenarios <- lapply(names(data), function(scenario_name) {
 })
 
 # Accessing the first four trees as an example
-first_tree <- scenarios[[2]][[2]][[1]]
-second_tree <- scenarios[[2]][[2]][[2]]
-third_tree <- scenarios[[2]][[2]][[3]]
-fourth_tree <- scenarios[[2]][[2]][[4]]
+first_tree <- scenarios[[1]][[2]][[1]]
+second_tree <- scenarios[[1]][[2]][[2]]
+third_tree <- scenarios[[1]][[2]][[3]]
+fourth_tree <- scenarios[[1]][[2]][[4]]
 
 # Plot the first four trees with margins and a time scale
 par(mfrow = c(2, 2), mar = c(2, 0.5, 2, 0.5))  # Arrange plots in a 2x2 grid with extra margins
@@ -357,43 +361,48 @@ Compute F matrices for each simulated Trees.
 
 Now try running a classification algorithm
 ```{r}
-# Create an empty data frame to store results
-all_distances <- data.frame(
-  distance = numeric(),
-  pair_type = character()
-)
-
-# Focus only on Scenario 2
-scenario_idx <- 2  # Specify the scenario index (Scenario 2)
-scenario_matrices <- distance_matrices_l1_uw[[scenario_idx]]  # Retrieve matrices for Scenario 2
-
-# Iterate over all matrices in Scenario 2
-for (matrix_idx in seq_along(scenario_matrices)) {
-  distance_matrix <- scenario_matrices[[matrix_idx]]  # Current distance matrix
+extract_features <- function(distance_matrices) {
+  feature_list <- list()
+  labels <- c()
   
-  # Flatten only the upper triangular part (excluding diagonal)
-  for (i in 1:4) {
-    for (j in (i + 1):4) {  # Start j from i + 1 to avoid diagonal and duplicates
-      # Determine pair type
-      pair_type <- if (i <= 2 && j <= 2) {
-        "selected-selected"
-      } else if (i > 2 && j > 2) {
-        "neutral-neutral"
-      } else {
-        "selected-neutral"
-      }
+  for (scenario_idx in seq_along(distance_matrices)) {
+    for (sim_idx in seq_along(distance_matrices[[scenario_idx]])) {
+      dmat <- distance_matrices[[scenario_idx]][[sim_idx]]
       
-      # Append to the data frame
-      all_distances <- rbind(
-        all_distances,
-        data.frame(distance = distance_matrix[i, j], pair_type = pair_type)
-      )
+      # Extract upper triangle (excluding diagonal)
+      feature_vector <- as.vector(dmat[upper.tri(dmat)])
+      
+      # Store extracted features
+      feature_list <- append(feature_list, list(feature_vector))
+      
+      # Generate labels (Tree types: 1,2,3,4)
+      labels <- c(labels, rep(1:4, each=1))  # Assuming tree types are fixed per 4x4 matrix
     }
   }
+  
+  # Convert to data frame
+  feature_matrix <- do.call(rbind, feature_list)
+  return(list(features = feature_matrix, labels = labels))
 }
+```
 
-# Check the structure of the resulting data
-head(all_distances)
+```{r}
+library(class)
+library(caret)
+
+set.seed(123)
+
+# Extract features and labels
+data <- extract_features(distance_matrices_l1_uw)
+features <- data$features
+labels <- as.factor(data$labels)
+
+# Split into training (80%) and test (20%)
+train_indices <- createDataPartition(labels, p = 0.8, list = FALSE)
+train_features <- features[train_indices, ]
+test_features <- features[-train_indices, ]
+train_labels <- labels[train_indices]
+test_labels <- labels[-train_indices]
 ```
 
 
