@@ -5,9 +5,14 @@ import random
 import daiquiri
 import logging
 from tqdm import tqdm
+import msprime
+import tskit
+from IPython.display import SVG, display
 
 def select_scenario(sc, Ne, pos):
     """Define msprime selective sweep model."""
+    if sc == 0:
+        return msprime.StandardCoalescent()  # Neutral evolution
     return msprime.SweepGenicSelection(
         position=pos,
         start_frequency=1.0 / (2 * Ne),
@@ -42,6 +47,8 @@ def run_simple_simulations(selection_scenario, Ne, L, num_samples, num_simulatio
     Returns:
         str: Path to the output JSON file.
     """
+    random.seed(123)
+
     # Create the file path
     file_path = get_file_path(Ne, L, num_samples, folder=folder)
 
@@ -68,8 +75,11 @@ def run_simple_simulations(selection_scenario, Ne, L, num_samples, num_simulatio
                 sequence_length=L,
             )
             m = sim.at(mut_loc).index
-            num_trees = sim.num_trees
-            indices = [m, m+1, int((m + num_trees) / 2), sim.num_trees - 1]
+            num_trees = sim.num_trees - 1
+            if m == num_trees:
+                indices = [m, m, m, m]
+            else:
+                indices = [m, m+1, int((m + num_trees) / 2), num_trees]
             trees = extract_trees(sim, indices)
             
             # Append to scenario data
@@ -99,9 +109,9 @@ def simulate_multiple_sweeps(selection_scenario, Ne, L, num_samples, num_simulat
     Returns:
         str: Path to the output JSON file.
     """
-    import logging
     
-    # random.seed(123)  # Seed for reproducibility
+    random.seed(123)  # Seed for reproducibility
+
     # Create the file path
     file_path = get_file_path_multiple_sweeps(Ne, L, num_samples, folder=folder)
 
@@ -185,35 +195,72 @@ def get_file_path_multiple_sweeps(Ne, L, num_samples, folder="results"):
 #     """Extract trees at specific indices and return Newick format strings."""
 #     return [sim.at_index(idx).as_newick() for idx in indices]
 
+def run_simple_simulation(selection_scenario, Ne, L, num_samples, recombination_rate=1e-7):
+    """Run a single msprime simulation and return the tree sequence."""
+    mut_loc = int(L / 4)
+
+    ts = msprime.sim_ancestry(
+        samples=num_samples,
+        model=[select_scenario(selection_scenario, Ne, mut_loc), msprime.StandardCoalescent()],
+        population_size=Ne,
+        recombination_rate=recombination_rate,
+        sequence_length=L,
+    )
+    return ts  # Return the tree sequence
+
 # Example usage
 if __name__ == "__main__":
-    selection_scenario = [0.001, 0.01, 0.1]
-    Ne = int(1e4)
-    L = int(1e5)
-    num_samples = 25
-    num_simulations = 300
-    num_sweeps = 1
-    recombination_rate = 1.25 * 1e-8
-    log_setting = [(1, 0), (1, 1), (1, 2)]
+
+    # ###########################
+    # # Simulate Multiple Sweeps#
+    # ###########################
+    # selection_scenario = [0.001, 0.01, 0.1, 0]
+    # Ne = int(1e4)
+    # L = int(1e5)
+    # num_samples = 10
+    # num_simulations = 300
+    # num_sweeps = 1
+    # recombination_rate = 1.25 * 1e-8
+    # log_setting = [(1, 0), (1, 1), (1, 2)]
     
-    # output_file = simulate_multiple_sweeps(
+    # # output_file = simulate_multiple_sweeps(
+    # #     selection_scenario=selection_scenario,
+    # #     Ne=Ne,
+    # #     L=L,
+    # #     num_samples=num_samples,
+    # #     num_simulations=num_simulations,
+    # #     num_sweeps=num_sweeps,
+    # #     recombination_rate=recombination_rate,
+    # #     # log_simulations=log_setting
+    # # )
+    # # print(f"Results saved to {output_file}")
+    
+    # output_file = run_simple_simulations(
     #     selection_scenario=selection_scenario,
     #     Ne=Ne,
     #     L=L,
     #     num_samples=num_samples,
     #     num_simulations=num_simulations,
-    #     num_sweeps=num_sweeps,
-    #     recombination_rate=recombination_rate,
-    #     # log_simulations=log_setting
+    #     recombination_rate=recombination_rate
     # )
     # print(f"Results saved to {output_file}")
-    
-    output_file = run_simple_simulations(
-        selection_scenario=selection_scenario,
-        Ne=Ne,
-        L=L,
-        num_samples=num_samples,
-        num_simulations=num_simulations,
-        recombination_rate=recombination_rate
-    )
-    print(f"Results saved to {output_file}")
+
+
+    ######################################
+    # Simulate Single Sweep and Visualize#
+    ######################################
+
+    # Define parameters
+    Ne = int(1e4)  # Effective population size
+    L = int(1e5)  # Chromosome length
+    num_samples = 10  # Number of samples
+    selection_scenario = 0.1  # Example selection coefficient
+
+    # Run the simulation
+    ts = run_simple_simulation(selection_scenario, Ne, L, num_samples)
+
+    # Save the visualization to an SVG file
+    with open("tree_sequence.svg", "w") as f:
+        f.write(ts.draw_svg(y_axis=True))
+
+    print("SVG saved as tree_sequence.svg. Open the file to view the visualization.")

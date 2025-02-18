@@ -214,13 +214,29 @@ calculate_pairwise_stats <- function(distance_matrices, indices = c(1, 2, 3), co
 }
 ```
 
+Defining a function to compute pairwise tree distances
+```{r}
+# Function to compute pairwise tree distances
+dist_matrix <- function(trees, dist_method = "l2", weighted = TRUE) {
+  n <- length(trees)
+  dmat <- matrix(0, nrow = n, ncol = n)
+  for (i in 1:n) {
+    for (j in i:n) {
+      dmat[i, j] <- dist_pairwise(trees[[i]], trees[[j]], dist.method = dist_method, weighted = weighted)
+    }
+  }
+  dmat <- dmat + t(dmat) - diag(diag(dmat)) # Mirror the lower triangle
+  return(dmat)
+}
+```
+
 Load json file and convert them into phylo objects
 ```{r}
 library(ape)
 library(jsonlite)
 
-# Load JSON data
-file_name <- "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/results_Ne_10000_L_100000_samples_25.json"
+# Load JSON data of interest
+file_name <- "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/results_Ne_10000_L_100000_samples_10.json"
 data <- fromJSON(file_name)
 
 # Convert each scenario into a list of phylo objects
@@ -235,10 +251,10 @@ scenarios <- lapply(names(data), function(scenario_name) {
 })
 
 # Accessing the first four trees as an example
-first_tree <- scenarios[[1]][[2]][[1]]
-second_tree <- scenarios[[1]][[2]][[2]]
-third_tree <- scenarios[[1]][[2]][[3]]
-fourth_tree <- scenarios[[1]][[2]][[4]]
+first_tree <- scenarios[[4]][[2]][[1]]
+second_tree <- scenarios[[4]][[2]][[2]]
+third_tree <- scenarios[[4]][[2]][[3]]
+fourth_tree <- scenarios[[4]][[2]][[4]]
 
 # Plot the first four trees with margins and a time scale
 par(mfrow = c(2, 2), mar = c(2, 0.5, 2, 0.5))  # Arrange plots in a 2x2 grid with extra margins
@@ -326,6 +342,133 @@ Get l2 weighted statistics
 calculate_pairwise_stats(distance_matrices_l2_w)
 ```
 
+Plot distribution of pairwise distances (l1uw)
+```{r}
+# Loop through scenarios and simulations to compute pairwise distances
+plot_data <- data.frame()
+
+# Loop through scenarios and simulations to compute pairwise distances
+par(mfrow = c(2, 2))  # Arrange plots in a 2x2 grid
+for (i in seq_along(scenarios)) {
+  scenario_number <- as.character(i)
+  scenario_data <- scenarios[[i]][1:50]
+  
+  for (tree_type in 1:4) {  # Loop over tree types
+    tree_distances <- lapply(scenario_data, function(sim) sim[[tree_type]])
+    # dmat_list <- lapply(tree_distances, dist_matrix)
+    dmat_list <- dist_matrix(tree_distances, "l1", FALSE)
+    
+    # Extract upper triangular part of distance matrices
+    list_d <- dmat_list[upper.tri(dmat_list)]
+    
+    # Store data for ggplot
+    plot_data <- rbind(plot_data, data.frame(Scenario = paste("Scenario ", scenario_number), TreeType = as.factor(tree_type), Distance = list_d))
+  }
+}
+
+# Plot using ggplot
+ggplot(plot_data, aes(x = Distance, fill = TreeType)) +
+  geom_histogram(alpha = 0.6, position = "identity", bins = 50) +
+  facet_wrap(~Scenario) +
+  theme_minimal() +
+  labs(title = "Pairwise Tree Distance Distributions (l1, unweighted)", x = "Pairwise Distance", y = "Density", fill = "Tree Type")
+```
+Plot distribution of pairwise distances (l1w)
+```{r}
+# Loop through scenarios and simulations to compute pairwise distances
+plot_data <- data.frame()
+
+# Loop through scenarios and simulations to compute pairwise distances
+par(mfrow = c(2, 2))  # Arrange plots in a 2x2 grid
+for (i in seq_along(scenarios)) {
+  scenario_number <- as.character(i)
+  scenario_data <- scenarios[[i]][1:50]
+  
+  for (tree_type in 1:4) {  # Loop over tree types
+    tree_distances <- lapply(scenario_data, function(sim) sim[[tree_type]])
+    # dmat_list <- lapply(tree_distances, dist_matrix)
+    dmat_list <- dist_matrix(tree_distances, "l1", TRUE)
+    
+    # Extract upper triangular part of distance matrices
+    list_d <- dmat_list[upper.tri(dmat_list)]
+    
+    # Store data for ggplot
+    plot_data <- rbind(plot_data, data.frame(Scenario = paste("Scenario ", scenario_number), TreeType = as.factor(tree_type), Distance = list_d))
+  }
+}
+
+# Plot using ggplot
+ggplot(plot_data, aes(x = Distance, fill = TreeType)) +
+  geom_histogram(alpha = 0.6, position = "identity", bins = 50) +
+  facet_wrap(~Scenario) +
+  theme_minimal() +
+  labs(title = "Pairwise Tree Distance Distributions (l1, weighted)", x = "Pairwise Distance", y = "Density", fill = "Tree Type")
+```
+
+Plot distribution of pairwise distances (l2uw)
+```{r}
+# Loop through scenarios and simulations to compute pairwise distances
+plot_data <- data.frame()
+
+# Loop through scenarios and simulations to compute pairwise distances
+par(mfrow = c(2, 2))  # Arrange plots in a 2x2 grid
+for (i in seq_along(scenarios)) {
+  scenario_number <- as.character(i)
+  scenario_data <- scenarios[[i]][1:50]
+  
+  for (tree_type in 1:4) {  # Loop over tree types
+    tree_distances <- lapply(scenario_data, function(sim) sim[[tree_type]])
+    # dmat_list <- lapply(tree_distances, dist_matrix)
+    dmat_list <- dist_matrix(tree_distances, "l2", FALSE)
+    
+    # Extract upper triangular part of distance matrices
+    list_d <- dmat_list[upper.tri(dmat_list)]
+    
+    # Store data for ggplot
+    plot_data <- rbind(plot_data, data.frame(Scenario = paste("Scenario ", scenario_number), TreeType = as.factor(tree_type), Distance = list_d))
+  }
+}
+
+# Plot using ggplot
+ggplot(plot_data, aes(x = Distance, fill = TreeType)) +
+  geom_histogram(alpha = 0.6, position = "identity", bins = 50) +
+  facet_wrap(~Scenario) +
+  theme_minimal() +
+  labs(title = "Pairwise Tree Distance Distributions (l2, unweighted)", x = "Pairwise Distance", y = "Density", fill = "Tree Type")
+```
+
+Plot distribution of pairwise distances (l2w)
+```{r}
+# Loop through scenarios and simulations to compute pairwise distances
+plot_data <- data.frame()
+
+# Loop through scenarios and simulations to compute pairwise distances
+par(mfrow = c(2, 2))  # Arrange plots in a 2x2 grid
+for (i in seq_along(scenarios)) {
+  scenario_number <- as.character(i)
+  scenario_data <- scenarios[[i]][1:50]
+  
+  for (tree_type in 1:4) {  # Loop over tree types
+    tree_distances <- lapply(scenario_data, function(sim) sim[[tree_type]])
+    # dmat_list <- lapply(tree_distances, dist_matrix)
+    dmat_list <- dist_matrix(tree_distances, "l2", TRUE)
+    
+    # Extract upper triangular part of distance matrices
+    list_d <- dmat_list[upper.tri(dmat_list)]
+    
+    # Store data for ggplot
+    plot_data <- rbind(plot_data, data.frame(Scenario = paste("Scenario ", scenario_number), TreeType = as.factor(tree_type), Distance = list_d))
+  }
+}
+
+# Plot using ggplot
+ggplot(plot_data, aes(x = Distance, fill = TreeType)) +
+  geom_histogram(alpha = 0.6, position = "identity", bins = 50) +
+  facet_wrap(~Scenario) +
+  theme_minimal() +
+  labs(title = "Pairwise Tree Distance Distributions (l2, weighted)", x = "Pairwise Distance", y = "Density", fill = "Tree Type")
+```
+
 Compute F matrices for each simulated Trees.
 ```{r}
 # # Assuming gen_Fmat() is already defined and available in your environment
@@ -359,50 +502,50 @@ Compute F matrices for each simulated Trees.
 # # print(Fmat_lists[[1]][[1]][[1]])
 ```
 
-Now try running a classification algorithm
-```{r}
-extract_features <- function(distance_matrices) {
-  feature_list <- list()
-  labels <- c()
-  
-  for (scenario_idx in seq_along(distance_matrices)) {
-    for (sim_idx in seq_along(distance_matrices[[scenario_idx]])) {
-      dmat <- distance_matrices[[scenario_idx]][[sim_idx]]
-      
-      # Extract upper triangle (excluding diagonal)
-      feature_vector <- as.vector(dmat[upper.tri(dmat)])
-      
-      # Store extracted features
-      feature_list <- append(feature_list, list(feature_vector))
-      
-      # Generate labels (Tree types: 1,2,3,4)
-      labels <- c(labels, rep(1:4, each=1))  # Assuming tree types are fixed per 4x4 matrix
-    }
-  }
-  
-  # Convert to data frame
-  feature_matrix <- do.call(rbind, feature_list)
-  return(list(features = feature_matrix, labels = labels))
-}
-```
+<!-- Now try running a classification algorithm -->
+<!-- ```{r} -->
+<!-- extract_features <- function(distance_matrices) { -->
+<!--   feature_list <- list() -->
+<!--   labels <- c() -->
 
-```{r}
-library(class)
-library(caret)
+<!--   for (scenario_idx in seq_along(distance_matrices)) { -->
+<!--     for (sim_idx in seq_along(distance_matrices[[scenario_idx]])) { -->
+<!--       dmat <- distance_matrices[[scenario_idx]][[sim_idx]] -->
 
-set.seed(123)
+<!--       # Extract upper triangle (excluding diagonal) -->
+<!--       feature_vector <- as.vector(dmat[upper.tri(dmat)]) -->
 
-# Extract features and labels
-data <- extract_features(distance_matrices_l1_uw)
-features <- data$features
-labels <- as.factor(data$labels)
+<!--       # Store extracted features -->
+<!--       feature_list <- append(feature_list, list(feature_vector)) -->
 
-# Split into training (80%) and test (20%)
-train_indices <- createDataPartition(labels, p = 0.8, list = FALSE)
-train_features <- features[train_indices, ]
-test_features <- features[-train_indices, ]
-train_labels <- labels[train_indices]
-test_labels <- labels[-train_indices]
-```
+<!--       # Generate labels (Tree types: 1,2,3,4) -->
+<!--       labels <- c(labels, rep(1:4, each=1))  # Assuming tree types are fixed per 4x4 matrix -->
+<!--     } -->
+<!--   } -->
+
+<!--   # Convert to data frame -->
+<!--   feature_matrix <- do.call(rbind, feature_list) -->
+<!--   return(list(features = feature_matrix, labels = labels)) -->
+<!-- } -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- library(class) -->
+<!-- library(caret) -->
+
+<!-- set.seed(123) -->
+
+<!-- # Extract features and labels -->
+<!-- data <- extract_features(distance_matrices_l1_uw) -->
+<!-- features <- data$features -->
+<!-- labels <- as.factor(data$labels) -->
+
+<!-- # Split into training (80%) and test (20%) -->
+<!-- train_indices <- createDataPartition(labels, p = 0.8, list = FALSE) -->
+<!-- train_features <- features[train_indices, ] -->
+<!-- test_features <- features[-train_indices, ] -->
+<!-- train_labels <- labels[train_indices] -->
+<!-- test_labels <- labels[-train_indices] -->
+<!-- ``` -->
 
 
