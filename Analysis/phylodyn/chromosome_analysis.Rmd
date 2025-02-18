@@ -1,0 +1,84 @@
+---
+title: "genomic_position"
+author: "Shinnosuke Yagi"
+date: "2025-02-17"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(jsonlite)
+library(ape)
+library(phylodyn)
+library(ggplot2)
+library(reshape2)
+```
+
+```{r}
+# Read the tree sequences from JSON file
+file_name <- "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/trees_newick_Ne_10000_L_100000_samples_10_s_0.1.json"
+trees_data <- fromJSON(file_name)
+
+# Convert Newick strings to phylo objects
+trees <- lapply(trees_data$newick, function(nw) read.tree(text = nw))
+
+# Get genomic positions
+genomic_positions <- as.numeric(trees_data$pos)
+
+# Compute pairwise distances
+n <- length(trees)
+dmat <- matrix(0, nrow = n, ncol = n)
+
+for (i in 1:n) {
+  for (j in i:n) {
+    dmat[i, j] <- dist_pairwise(trees[[i]], trees[[j]], dist.method = "l2", weighted = TRUE)
+  }
+}
+# Symmetrize the matrix
+dmat <- dmat + t(dmat) - diag(diag(dmat))
+
+# Compute total distance for each tree
+total_distances <- apply(dmat, 1, sum)
+
+# Create a dataframe for plotting
+plot_data <- data.frame(GenomicPosition = genomic_positions, TotalDistance = total_distances)
+```
+
+```{r}
+# Define the sweep position (L/4)
+sweep_position <- 25000
+
+# Plot total distances across the chromosome with a vertical line and annotation
+ggplot(plot_data, aes(x = GenomicPosition, y = TotalDistance)) +
+  geom_point(color = "blue", size = 2) +
+  geom_vline(xintercept = sweep_position, linetype = "dashed", color = "red") +
+  annotate("text", x = sweep_position + 2000, y = mean(plot_data$TotalDistance) + 4*sd(plot_data$TotalDistance), 
+           label = "Selective Sweep", color = "red", angle = 90, vjust = 0.5) +
+  labs(title = "Pairwise Tree Distances Across Chromosome (s = 0.1)",
+       x = "Genomic Position",
+       y = "Total Distance to All Trees") +
+  theme_minimal()
+```
+
+```{r}
+# Example: Assume dmat is your distance matrix
+# Convert distance matrix to a vector, excluding the diagonal (self-distances)
+list_d <- dmat[upper.tri(dmat)]
+
+# Convert to a data frame
+df <- data.frame(distance = list_d)
+
+# Create the histogram
+ggplot(df, aes(x = distance)) +
+  geom_histogram(binwidth = 1000, fill = "steelblue", color = "black") +
+  theme_minimal() +
+  labs(title = "Histogram of Pairwise Distances",
+       x = "Distance",
+       y = "Frequency")
+```
+
+
+
