@@ -10,3 +10,5 @@ Images/
 
 # Exclude Python virtual environments
 venv/
+
+README.md
