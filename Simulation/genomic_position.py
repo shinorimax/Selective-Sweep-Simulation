@@ -12,7 +12,7 @@ def get_file_path(selection_scenario, Ne, L, num_samples, folder="Results"):
 
 
 # Function to simulate a chromosome and save trees
-def run_simple_simulation(selection_scenario, Ne, L, num_samples, recombination_rate=1.25 * 1e-8, seed = None):
+def run_simple_simulation(selection_scenario, Ne, L, num_samples, recombination_rate=1.0 * 1e-7, seed = None):
     """Run msprime simulation and save trees in Newick format.""" 
 
     if selection_scenario==0:

@@ -23,6 +23,8 @@ library (ggplot2)
 library(stringr)
 library(jsonlite)
 library(dplyr)
+install.packages("ggpubr")
+library(ggpubr)
 library(boot)
 ```
 
@@ -151,6 +153,8 @@ Define Visualizing function
 # Define the function
 plot_mds_scenarios <- function(distance_matrices, trees_per_simulation, tree_colors = c("#F8766D", "#7CAE00", "#00BFC4", "#C77CFF")) {
   
+  plot_list <- list()  # Store plots for each scenario
+  
   # Iterate over each scenario in the distance matrices
   for (scenario_idx in seq_along(distance_matrices)) {
     scenario_dmat_list <- distance_matrices[[scenario_idx]]
@@ -229,16 +233,23 @@ plot_mds_scenarios <- function(distance_matrices, trees_per_simulation, tree_col
       ) +
       theme(legend.position="right")
     
-    # Display the plot
+    # Store the plot
+    plot_list[[length(plot_list) + 1]] <- p
+    
     print(p)
   }
+  # Arrange plots in a 2x2 grid
+  final_plot <- ggarrange(plotlist = plot_list, ncol = 2, nrow = 2, common.legend = TRUE, legend = "right")
+  
+  # Display the final grid of plots
+  print(final_plot)
 }
 ```
 
 Define Calculating average distances
 ```{r}
 # Define the function
-calculate_pairwise_stats <- function(distance_matrices, indices = c(1, 2, 3), conf_level = 0.95) {
+calculate_pairwise_stats <- function(distance_matrices, indices = c(1, 2, 3, 4), conf_level = 0.95) {
   # Check if indices are valid
   if (any(indices > length(distance_matrices))) {
     stop("Indices exceed the number of elements in the distance_matrices list.")
@@ -575,8 +586,9 @@ calculate_pairwise_stats(distance_matrices_l1_uw)
 
 Generate confusion matrix
 ```{r}
-cm_l1uw <- generate_confusion_matrices(scenarios, dist_method = "l1", weighted = FALSE, trees_per_simulation = 4)
+# cm_l1uw <- generate_confusion_matrices(scenarios, dist_method = "l1", weighted = FALSE, trees_per_simulation = 4)
 ```
+
 ```{r}
 l1uw_cm <- generate_mds_confusion_matrices(distance_matrices_l1_uw)
 l1uw_cm
@@ -601,6 +613,13 @@ Get l1 weighted statistics
 calculate_pairwise_stats(distance_matrices_l1_w)
 ```
 
+Generate confusion matrix for l1w
+```{r}
+l1w_cm <- generate_mds_confusion_matrices(distance_matrices_l1_w)
+l1w_cm
+```
+
+
 Calculate l2 unweighted distances
 ```{r}
 distance_matrices_l2_uw <- generate_distance_matrices(scenarios, dist_method = "l2", weighted = FALSE, trees_per_simulation = 4)
@@ -616,6 +635,12 @@ Get l2 unweighted statistics
 ```{r}
 # Assuming `distance_matrices_l2_w` is the list of distance matrices
 calculate_pairwise_stats(distance_matrices_l2_uw)
+```
+
+Generate confusion matrix for l2uw
+```{r}
+l2uw_cm <- generate_mds_confusion_matrices(distance_matrices_l2_uw)
+l2uw_cm
 ```
 
 Calculate l2 weighted distances
@@ -635,6 +660,12 @@ Get l2 weighted statistics
 ```{r}
 # Assuming `distance_matrices_l2_w` is the list of distance matrices
 calculate_pairwise_stats(distance_matrices_l2_w)
+```
+
+Generate confusion matrix for l2w
+```{r}
+l2w_cm <- generate_mds_confusion_matrices(distance_matrices_l2_w)
+l2w_cm
 ```
 
 Plot distribution of pairwise distances (l1uw)

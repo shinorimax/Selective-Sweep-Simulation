@@ -19,7 +19,7 @@ library(reshape2)
 
 ```{r}
 # Read the tree sequences from JSON file
-file_name <- "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/trees_newick_Ne_10000_L_100000_samples_10_s_0.1.json"
+file_name <- "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/trees_newick_Ne_10000_L_100000_samples_10_s_0.01.json"
 trees_data <- fromJSON(file_name)
 
 # Convert Newick strings to phylo objects
