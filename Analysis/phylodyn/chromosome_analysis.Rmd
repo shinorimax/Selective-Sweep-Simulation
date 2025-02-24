@@ -32,9 +32,20 @@ genomic_positions <- as.numeric(trees_data$pos)
 n <- length(trees)
 dmat <- matrix(0, nrow = n, ncol = n)
 
+prev_percentage <- -1  # Track last printed percentage
+
 for (i in 1:n) {
   for (j in i:n) {
     dmat[i, j] <- dist_pairwise(trees[[i]], trees[[j]], dist.method = "l2", weighted = TRUE)
+  }
+  
+  # Compute percentage
+  percentage <- floor(i / n * 100)
+
+  # Print only when percentage changes
+  if (percentage != prev_percentage) {
+    cat(sprintf("Progress: %d%% completed\n", percentage))
+    prev_percentage <- percentage  # Update last printed percentage
   }
 }
 # Symmetrize the matrix
@@ -67,6 +78,80 @@ ggplot(plot_data, aes(x = GenomicPosition, y = TotalDistance)) +
 # Example: Assume dmat is your distance matrix
 # Convert distance matrix to a vector, excluding the diagonal (self-distances)
 list_d <- dmat[upper.tri(dmat)]
+
+# Convert to a data frame
+df <- data.frame(distance = list_d)
+
+# Create the histogram
+ggplot(df, aes(x = distance)) +
+  geom_histogram(binwidth = 1000, fill = "steelblue", color = "black") +
+  theme_minimal() +
+  labs(title = "Histogram of Pairwise Distances",
+       x = "Distance",
+       y = "Frequency")
+```
+
+```{r}
+# Read the tree sequences from JSON file
+file_name <- "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/trees_newick_Ne_10000_L_100000_samples_10_s_0.json"
+trees_data <- fromJSON(file_name)
+
+# Convert Newick strings to phylo objects
+trees <- lapply(trees_data$newick, function(nw) read.tree(text = nw))
+
+# Get genomic positions
+genomic_positions_2 <- as.numeric(trees_data$pos)
+
+# Compute pairwise distances
+n <- length(trees)
+dmat_2 <- matrix(0, nrow = n, ncol = n)
+
+prev_percentage <- -1  # Track last printed percentage
+
+for (i in 1:n) {
+  for (j in i:n) {
+    dmat_2[i, j] <- dist_pairwise(trees[[i]], trees[[j]], dist.method = "l2", weighted = TRUE)
+  }
+  
+  # Compute percentage
+  percentage <- floor(i / n * 100)
+
+  # Print only when percentage changes
+  if (percentage != prev_percentage) {
+    cat(sprintf("Progress: %d%% completed\n", percentage))
+    prev_percentage <- percentage  # Update last printed percentage
+  }
+}
+# Symmetrize the matrix
+dmat_2 <- dmat_2 + t(dmat_2) - diag(diag(dmat_2))
+
+# Compute total distance for each tree
+total_distances_2 <- apply(dmat_2, 1, sum)
+
+# Create a dataframe for plotting
+plot_data_2 <- data.frame(GenomicPosition = genomic_positions_2, TotalDistance = total_distances_2)
+```
+
+```{r}
+# Define the sweep position (L/4)
+sweep_position <- 25000
+
+# Plot total distances across the chromosome with a vertical line and annotation
+ggplot(plot_data_2, aes(x = GenomicPosition, y = TotalDistance)) +
+  geom_point(color = "blue", size = 2) +
+  # geom_vline(xintercept = sweep_position, linetype = "dashed", color = "red") +
+  # annotate("text", x = sweep_position + 2000, y = mean(plot_data_2$TotalDistance) + 4*sd(plot_data_2$TotalDistance), 
+  #         label = "Selective Sweep", color = "red", angle = 90, vjust = 0.5) +
+  labs(title = "Pairwise Tree Distances Across Chromosome (s = 0)",
+       x = "Genomic Position",
+       y = "Total Distance to All Trees") +
+  theme_minimal()
+```
+
+```{r}
+# Example: Assume dmat is your distance matrix
+# Convert distance matrix to a vector, excluding the diagonal (self-distances)
+list_d <- dmat[upper.tri(dmat_2)]
 
 # Convert to a data frame
 df <- data.frame(distance = list_d)

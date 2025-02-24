@@ -211,9 +211,9 @@ def run_simple_simulation(selection_scenario, Ne, L, num_samples, recombination_
 # Example usage
 if __name__ == "__main__":
 
-    # ###########################
-    # # Simulate Multiple Sweeps#
-    # ###########################
+    # ############################
+    # # Run Multiple Simulations #
+    # ############################
     # selection_scenario = [0.001, 0.01, 0.1, 0]
     # Ne = int(1e4)
     # L = int(1e5)
@@ -223,6 +223,7 @@ if __name__ == "__main__":
     # recombination_rate = 1.25 * 1e-8
     # log_setting = [(1, 0), (1, 1), (1, 2)]
     
+    # Simulate multiple sweeps
     # # output_file = simulate_multiple_sweeps(
     # #     selection_scenario=selection_scenario,
     # #     Ne=Ne,
@@ -235,6 +236,7 @@ if __name__ == "__main__":
     # # )
     # # print(f"Results saved to {output_file}")
     
+    # Simulate single sweep
     # output_file = run_simple_simulations(
     #     selection_scenario=selection_scenario,
     #     Ne=Ne,
@@ -246,9 +248,9 @@ if __name__ == "__main__":
     # print(f"Results saved to {output_file}")
 
 
-    ######################################
-    # Simulate Single Sweep and Visualize#
-    ######################################
+    #########################################
+    # Simulate Single Instance and Visualize#
+    #########################################
 
     # Define parameters
     Ne = int(1e4)  # Effective population size

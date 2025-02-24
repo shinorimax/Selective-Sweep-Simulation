@@ -1,6 +1,7 @@
 import msprime
 import json
 import os
+import random
 
 
 def get_file_path(selection_scenario, Ne, L, num_samples, folder="Results"):
@@ -11,8 +12,9 @@ def get_file_path(selection_scenario, Ne, L, num_samples, folder="Results"):
 
 
 # Function to simulate a chromosome and save trees
-def run_simple_simulation(selection_scenario, Ne, L, num_samples, recombination_rate=1e-7, seed = None):
+def run_simple_simulation(selection_scenario, Ne, L, num_samples, recombination_rate=1.25 * 1e-8, seed = None):
     """Run msprime simulation and save trees in Newick format.""" 
+
     if selection_scenario==0:
         ts = msprime.sim_ancestry(
         samples=num_samples,
