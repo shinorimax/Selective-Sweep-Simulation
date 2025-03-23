@@ -26,6 +26,12 @@ library(dplyr)
 install.packages("ggpubr")
 library(ggpubr)
 library(boot)
+library(progress)
+```
+
+```{r}
+# Import functions from utils file
+source("utils.R")
 ```
 
 Define Function to generate distance matrix

@@ -1,0 +1,156 @@
+---
+title: "giant_MDS"
+author: "Shinnosuke Yagi"
+date: "2025-03-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library (ape)
+library (spam)
+library (usethis)
+library (devtools)
+library (INLA)
+library (phytools)
+library(devtools)
+library(phylodyn)
+library(knitr)
+library (ggplot2)
+library(stringr)
+library(jsonlite)
+library(dplyr)
+install.packages("ggpubr")
+library(ggpubr)
+library(boot)
+library(progress)
+```
+
+```{r}
+# Import functions from utils file
+source("utils.R")
+```
+
+```{r}
+# -------- CONFIGURATION --------
+file_name <- "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/results_Ne_10000_L_100000_samples_25.json"
+n_sim_test <- 300  # Number of simulations per scenario (300 x 4 = 1200 trees)
+scenario_names <- names(fromJSON(file_name))
+distance <- "l1"
+weighted <- TRUE
+```
+
+
+```{r}
+# -------- LOOP THROUGH SCENARIOS --------
+plot_list <- list()
+n_scenarios <- length(scenarios)
+n_trees <- n_sim_test * 4  # e.g. 30 simulations × 4 tree types
+
+for (scenario_idx in seq_along(scenarios)) {
+  message(sprintf("Processing Scenario %d...", scenario_idx))
+
+  scenario <- scenarios[[scenario_idx]]
+  scenario_small <- scenario[1:n_sim_test]  # Subset to n_sim_test simulations
+
+  # Flatten tree list and metadata
+  tree_list <- list()
+  tree_info <- data.frame(TreeID = integer(), TreeType = integer(), Simulation = integer())
+  tree_counter <- 1
+
+  for (sim_idx in seq_along(scenario_small)) {
+    trees <- scenario_small[[sim_idx]]
+    for (tree_type in seq_along(trees)) {
+      tree_list[[tree_counter]] <- trees[[tree_type]]
+      tree_info <- rbind(tree_info, data.frame(
+        TreeID = tree_counter,
+        TreeType = tree_type,
+        Simulation = sim_idx
+      ))
+      tree_counter <- tree_counter + 1
+    }
+  }
+
+  # -------- PAIRWISE DISTANCE MATRIX WITH IN-PLACE % UPDATE --------
+  n_trees <- length(tree_list)
+  dmat <- matrix(0, nrow = n_trees, ncol = n_trees)
+
+  total_pairs <- (n_trees * (n_trees - 1)) / 2
+  pair_counter <- 0
+  last_percent <- -1
+
+  for (i in 1:(n_trees - 1)) {
+    for (j in (i + 1):n_trees) {
+      dist_val <- dist_pairwise(tree_list[[i]], tree_list[[j]], dist.method = distance, weighted = weighted)  # your custom function
+      dmat[i, j] <- dist_val
+      dmat[j, i] <- dist_val
+
+      pair_counter <- pair_counter + 1
+      percent_done <- round((pair_counter / total_pairs) * 100, 1)
+
+      if (percent_done != last_percent) {
+        cat(sprintf("\rScenario %d progress: %5.1f%%", scenario_idx, percent_done))
+        flush.console()
+        last_percent <- percent_done
+      }
+    }
+  }
+  cat("\n")  # move to new line after 100%
+
+  diag(dmat) <- 0
+
+  # -------- MDS & PLOTTING --------
+  mds <- cmdscale(dmat, eig = TRUE, k = 2)
+
+  plot_data <- data.frame(
+    Dimension1 = mds$points[, 1],
+    Dimension2 = mds$points[, 2],
+    TreeType = as.factor(tree_info$TreeType),
+    Simulation = tree_info$Simulation
+  )
+
+  # Variance calculation
+  variance_summary <- plot_data %>%
+    group_by(TreeType) %>%
+    summarize(
+      Var_Dim1 = var(Dimension1, na.rm = TRUE),
+      Var_Dim2 = var(Dimension2, na.rm = TRUE),
+      Total_Variance = Var_Dim1 + Var_Dim2
+    ) %>%
+    mutate(Scenario = scenario_idx)
+
+  if (scenario_idx == 1) {
+    all_variance <- variance_summary
+  } else {
+    all_variance <- bind_rows(all_variance, variance_summary)
+  }
+
+  # Generate plot
+  p <- ggplot(plot_data, aes(x = Dimension1, y = Dimension2, color = TreeType)) +
+    geom_point(size = 2, alpha = 0.7) +
+    scale_color_manual(values = c("1" = "#F8766D", "2" = "#7CAE00", "3" = "#00BFC4", "4" = "#C77CFF")) +
+    labs(
+      title = paste0("MDS Plot - Scenario ", scenario_idx),
+      x = paste0("Dimension 1 (", round(mds$eig[1] / sum(mds$eig) * 100, 2), "%)"),
+      y = paste0("Dimension 2 (", round(mds$eig[2] / sum(mds$eig) * 100, 2), "%)"),
+      color = "Tree Type"
+    ) +
+    theme_minimal()
+
+  plot_list[[scenario_idx]] <- p
+
+  # Save plot
+  output_dir <- "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Images/Full MDS Plot"
+  if (!dir.exists(output_dir)) dir.create(output_dir, recursive = TRUE)
+  filename <- sprintf("mds_plot_scenario_%d_n%d_%s%s.png", scenario_idx, n_sim_test, distance, weighted)
+  full_path <- file.path(output_dir, filename)
+  ggsave(full_path, plot = p, width = 8, height = 6, dpi = 300)
+}
+```
+
+```{r}
+print(all_variance)
+```
