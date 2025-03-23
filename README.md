@@ -5,6 +5,7 @@ This directory contains R scripts for analysis in `phylodyn`.
 
 - **`phylodyn_rework.Rmd`**: Main analysis script to generate MDS plots, pairwise distance distributions, and more.
 - **`chromosome_analysis.Rmd`**: Scripts for singular chromosome analysis, including plots of distance totals per locus.
+- **`giant_MDS.Rmd`**: Script to make MDS plot with full distance matrix (all vs all)
 
 ## Results
 This directory includes JSON files of simulation results. *(Note: These files are not included in the GitHub repository.)*
