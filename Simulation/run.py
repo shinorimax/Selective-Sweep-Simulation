@@ -5,7 +5,6 @@ import random
 import daiquiri
 import logging
 from tqdm import tqdm
-import msprime
 import tskit
 from IPython.display import SVG, display
 

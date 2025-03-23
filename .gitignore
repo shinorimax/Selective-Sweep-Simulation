@@ -3,12 +3,21 @@
 .Rhistory
 .RData
 .Ruserdata
+.trees
+*.vcf
+*.vcf.gz
+*.npz
 
 # Exclude Results folder
 Results/
 Images/
+1000genomes/
 
 # Exclude Python virtual environments
 venv/
+venv-lct/
+.venv/
+__pycache__/
+.ipynb_checkpoints/
 
 README.md
