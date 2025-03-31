@@ -39,8 +39,8 @@ source("utils.R")
 file_name <- "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/results_Ne_10000_L_100000_samples_25.json"
 n_sim_test <- 300  # Number of simulations per scenario (300 x 4 = 1200 trees)
 scenario_names <- names(fromJSON(file_name))
-distance <- "l1"
-weighted <- TRUE
+distance <- "l2"
+weighted <- FALSE
 ```
 
 
