@@ -23,7 +23,7 @@ library (ggplot2)
 library(stringr)
 library(jsonlite)
 library(dplyr)
-install.packages("ggpubr")
+# install.packages("ggpubr")
 library(ggpubr)
 library(boot)
 library(progress)
@@ -40,7 +40,7 @@ file_name <- "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Select
 n_sim_test <- 300  # Number of simulations per scenario (300 x 4 = 1200 trees)
 scenario_names <- names(fromJSON(file_name))
 distance <- "l2"
-weighted <- FALSE
+weighted <- TRUE
 ```
 
 
