@@ -1,0 +1,601 @@
+---
+title: "HMM_modeling"
+author: "Shinnosuke Yagi"
+date: "2025-04-05"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Import libraries
+
+```{r}
+library(ape)
+library (spam)
+library (usethis)
+library (devtools)
+library (INLA)
+library (phytools)
+library(devtools)
+library(phylodyn)
+library(knitr)
+library (ggplot2)
+library(stringr)
+library(jsonlite)
+library(dplyr)
+library(reticulate)
+library(reshape2)
+library(tidyr)
+```
+
+## Add "state" column to the dataframe, indicating whether the tree position is under selection (1) or neutral (0)
+
+```{r}
+all_files <- list.files("/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/SelectedTreesWithPositions", pattern = "\\.csv$", full.names = TRUE)
+
+# Parameters
+selected_site <- 25000  # Location of selection in bp
+
+for (file in all_files) {
+  df <- read.csv(file)
+  df <- df %>%
+    mutate(state = ifelse(left <= selected_site & right > selected_site, 1, 0))
+  
+  # Overwrite the same file or save a new one
+  write.csv(df, file, row.names = FALSE)
+}
+```
+
+## Generate F-matrix for all the newick trees
+
+```{r}
+all_chromosomes <- list()
+
+for (file_index in seq_along(all_files)) {
+  file <- all_files[file_index]
+  df <- read.csv(file)
+
+  message(sprintf("Processing file %d of %d: %s", file_index, length(all_files), basename(file)))
+  
+  chrom_trees <- list()
+  
+  for (i in seq_len(nrow(df))) {
+    newick_str <- df$newick[i]
+    state_label <- df$state[i]
+    left_pos <- df$left[i]
+    right_pos <- df$right[i]
+
+    if (is.na(newick_str) || newick_str == "") next
+
+    tryCatch({
+      tree <- read.tree(text = newick_str)
+      Fmat <- gen_Fmat(tree)
+
+      chrom_trees[[length(chrom_trees) + 1]] <- list(
+        Fmat = Fmat,
+        state = state_label,
+        left = left_pos,
+        right = right_pos
+      )
+
+      counter <- counter + 1
+      if (counter %% 100 == 0) {
+        # message(sprintf("...Processed %d trees so far", counter))
+      }
+    }, error = function(e) {
+     #  warning(sprintf("Skipping row %d in file %s: %s", i, basename(file), e$message))
+    })
+  }
+
+  # Store each chromosome's list of trees
+  chrom_name <- tools::file_path_sans_ext(basename(file))
+  all_chromosomes[[chrom_name]] <- chrom_trees
+}
+```
+
+```{r}
+saveRDS(all_chromosomes, "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/SelectedTreesWithPositions/all_chromosomes_grouped.rds")
+```
+
+```{r}
+all_trees <- list()
+counter <- 0
+
+for (file_index in seq_along(all_files)) {
+  file <- all_files[file_index]
+  df <- read.csv(file)
+
+  message(sprintf("Processing file %d of %d: %s", file_index, length(all_files), basename(file)))
+
+  for (i in seq_len(nrow(df))) {
+    newick_str <- df$newick[i]
+    state_label <- df$state[i]
+    left_pos <- df$left[i]
+    right_pos <- df$right[i]
+
+    if (is.na(newick_str) || newick_str == "") next
+
+    tryCatch({
+      tree <- read.tree(text = newick_str)
+      Fmat <- gen_Fmat(tree)
+
+      all_trees[[length(all_trees) + 1]] <- list(
+        Fmat = Fmat,
+        state = state_label,
+        left = left_pos,
+        right = right_pos
+      )
+
+      counter <- counter + 1
+      if (counter %% 100 == 0) {
+        message(sprintf("...Processed %d trees so far", counter))
+      }
+    }, error = function(e) {
+      warning(sprintf("Skipping row %d in file %s: %s", i, basename(file), e$message))
+    })
+  }
+}
+
+# Save with genomic positions now included
+saveRDS(
+  all_trees,
+  file = "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/all_trees_with_Fmat.rds"
+)
+
+message(sprintf("✅ Done! Total trees processed: %d", counter))
+```
+
+## Split data into training and test set
+
+```{r}
+# Get all chromosome names
+set.seed(42)
+chrom_names <- names(all_chromosomes)
+n_total <- length(chrom_names)
+
+# Split chromosome-level
+n_train <- floor(0.6 * n_total)
+n_val <- floor(0.3 * n_total)
+n_test <- n_total - n_train - n_val
+
+train_chroms <- chrom_names[1:n_train]
+val_chroms <- chrom_names[(n_train + 1):(n_train + n_val)]
+test_chroms <- chrom_names[(n_train + n_val + 1):n_total]
+
+train_set <- all_chromosomes[train_chroms]
+val_set <- all_chromosomes[val_chroms]
+test_set <- all_chromosomes[test_chroms]
+
+rm(all_chromosomes)
+gc()
+```
+
+```{r}
+# Split data into train (60%), validation (30%), test (10%)
+set.seed(42)
+n <- length(tree_data)
+indices <- sample(seq_len(n))
+
+n_train <- floor(0.6 * n)
+n_val   <- floor(0.3 * n)
+n_test  <- n - n_train - n_val
+
+train_set <- tree_data[indices[1:n_train]]
+val_set   <- tree_data[indices[(n_train + 1):(n_train + n_val)]]
+test_set  <- tree_data[indices[(n_train + n_val + 1):n]]
+```
+
+## Compute $F_0$ and $F_1$
+
+```{r}
+# Function to pad F-matrices to a target size
+pad_Fmat <- function(Fmat, target_dim) {
+  m <- nrow(Fmat)
+  if (m == target_dim) return(Fmat)
+  padded <- matrix(0, nrow = target_dim, ncol = target_dim)
+  padded[1:m, 1:m] <- Fmat
+  return(padded)
+}
+
+# Filter F_1 from training set (state == 1)
+# F1_list <- lapply(train_set, function(x) {
+#   if (x$state == 1) x$Fmat else NULL
+# })
+F1_list <- lapply(unlist(train_set, recursive = FALSE), function(x) {
+  if (x$state == 1) x$Fmat else NULL
+})
+F1_list <- Filter(Negate(is.null), F1_list)
+
+# Filter F_0 from training set (state == 0 AND far from selected site)
+# F0_list <- lapply(train_set, function(x) {
+#   if (x$state == 0 && !is.null(x$left) && x$left > 50000) x$Fmat else NULL
+# })
+F0_list <- lapply(unlist(train_set, recursive = FALSE), function(x) {
+  if (x$state == 0 && !is.null(x$left) && x$left > 50000) x$Fmat else NULL
+})
+F0_list <- Filter(Negate(is.null), F0_list)
+
+# Pad all to the max dimension
+max_dim <- max(sapply(c(F0_list, F1_list), function(F) nrow(F)))
+F0_list_padded <- lapply(F0_list, pad_Fmat, target_dim = max_dim)
+F1_list_padded <- lapply(F1_list, pad_Fmat, target_dim = max_dim)
+
+# Average function
+average_Fmat <- function(F_list) {
+  Reduce("+", F_list) / length(F_list)
+}
+
+# Compute average F-matrices
+F_0 <- average_Fmat(F0_list_padded)
+F_1 <- average_Fmat(F1_list_padded)
+
+# Optionally save
+saveRDS(list(train = train_set, val = val_set, test = test_set), "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/tree_data_split.rds")
+saveRDS(list(F_0 = F_0, F_1 = F_1), "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/F0_F1_from_training.rds")
+```
+
+## Visualize $F_0$ and $F_1$ matrices
+
+```{r}
+# Helper: plot an F-matrix
+plot_F_matrix <- function(Fmat, title = "F-matrix") {
+  # Convert to data frame and check dimensions
+  if (!is.matrix(Fmat)) stop("Input must be a matrix")
+  F_df <- as.data.frame(Fmat)
+  F_df$i <- nrow(F_df):1  # for y-axis reversal
+  F_long <- reshape2::melt(F_df, id.vars = "i")
+  colnames(F_long) <- c("i", "j", "value")
+
+  ggplot(F_long, aes(x = j, y = i, fill = value)) +
+    geom_tile(color = "white") +
+    scale_fill_gradient(low = "white", high = "steelblue") +
+    labs(title = title, x = "j", y = "i") +
+    theme_minimal() +
+    coord_fixed()
+}
+
+# Example usage (assuming F_0 and F_1 are defined in your environment)
+plot_F_matrix(F_0, "Average F-matrix (Neutral, F_0)")
+plot_F_matrix(F_1, "Average F-matrix (Selective, F_1)")
+```
+
+## Compute emission probabilities for F-matrices
+
+```{r}
+# Input: 
+#   F_list: list of F-matrices (test set)
+#   F_0, F_1: average F-matrices from training
+#   beta: emission sharpness parameter
+# Output:
+#   Emission matrix E (T x 2)
+
+compute_emission_matrix <- function(F_list, F_0, F_1, beta_0 = 0.001, beta_1 = 0.01) {
+  frob_squared <- function(Fa, Fb) {
+    sum((Fa - Fb)^2)
+  }
+
+  T <- length(F_list)
+  E <- matrix(NA, nrow = T, ncol = 2)
+
+  for (t in seq_len(T)) {
+    Ft <- F_list[[t]]
+
+    d0 <- frob_squared(Ft, F_0)
+    d1 <- frob_squared(Ft, F_1)
+
+    E[t, 1] <- exp(-beta_0 * d0)  # P(F_t | S_t = 0)
+    E[t, 2] <- exp(-beta_1 * d1)  # P(F_t | S_t = 1)
+  }
+
+  # Safe normalization
+  row_sums <- rowSums(E)
+  row_sums[row_sums == 0] <- 1e-12  # avoid NaN
+  E <- E / row_sums
+
+  return(E)
+}
+```
+
+## Apply on validation set
+
+```{r}
+# Assuming you already have:
+#   - test_set (list of trees)
+#   - F_0, F_1 (average F-matrices from training)
+#   - beta_1 (start with 1.0)
+
+# Prepare padded F-matrices from validation set
+max_dim <- max(nrow(F_0), nrow(F_1))
+pad_Fmat <- function(Fmat, target_dim) {
+  padded <- matrix(0, nrow = target_dim, ncol = target_dim)
+  padded[1:nrow(Fmat), 1:ncol(Fmat)] <- Fmat
+  return(padded)
+}
+
+# F_val_list <- lapply(val_set, function(x) pad_Fmat(x$Fmat, max_dim))
+F_val_list <- lapply(unlist(val_set, recursive = FALSE), function(x) pad_Fmat(x$Fmat, max_dim))
+
+# Example: compute emission matrix with current beta values
+E_val <- compute_emission_matrix(F_val_list, F_0, F_1, beta_0 = 0.001, beta_1 = 0.002)
+```
+
+## Visualize E_val statistics
+
+```{r}
+summary(E_val[,1])  # Neutral emission probs
+summary(E_val[,2])  # Selective emission probs
+
+# For all F-matrices in the validation set, What are the likelihoods of those matrices under each state?
+hist(E_val[,1], breaks = 50, col = "#7cc4b0", main = "Emission probabilities for state = 0 (neutral)")
+hist(E_val[,2], breaks = 50, col = "#7c9cc4", main = "Emission probabilities for state = 1 (selective)")
+```
+
+## Estimate Transition Matrix from training data
+
+```{r}
+# Initialize count matrix
+trans_counts <- matrix(0, nrow = 2, ncol = 2)
+
+for (chrom in train_set) {
+  state_seq <- sapply(chrom, function(x) x$state)
+  
+  for (i in 1:(length(state_seq) - 1)) {
+    from <- state_seq[i] + 1
+    to   <- state_seq[i + 1] + 1
+    trans_counts[from, to] <- trans_counts[from, to] + 1
+  }
+}
+
+# Normalize rows to get transition probabilities
+A_estimated <- trans_counts / rowSums(trans_counts)
+
+# Result
+print(A_estimated)
+```
+
+## Forward Algorithm
+
+```{r}
+forward_algorithm <- function(E, pi, A) {
+  T <- nrow(E)
+  alpha <- matrix(0, nrow = T, ncol = 2)
+
+  alpha[1, ] <- pi * E[1, ]
+
+  for (t in 2:T) {
+    for (s in 1:2) {
+      alpha[t, s] <- E[t, s] * sum(alpha[t - 1, ] * A[, s])
+    }
+  }
+
+  L <- sum(alpha[T, ])
+  if (L == 0) L <- 1e-300  # prevent log(0)
+  return(list(alpha = alpha, log_likelihood = log(L)))
+}
+```
+
+## Negative Log-Likelihood function for optim
+
+```{r}
+# ### Original ###
+# neg_log_likelihood <- function(beta_vec, F_list, F_0, F_1, pi, A) {
+#   beta_0 <- beta_vec[1]
+#   beta_1 <- beta_vec[2]
+# 
+#   # Compute emission matrix
+#   E <- compute_emission_matrix(F_list, F_0, F_1, beta_0, beta_1)
+# 
+#   # Run forward algorithm
+#   result <- forward_algorithm(E, pi, A)
+# 
+#   # Return negative log-likelihood
+#   return(-result$log_likelihood)
+# }
+# ################
+
+### With Regularization ###
+neg_log_likelihood <- function(beta_vec, F_list, F_0, F_1, pi, A, lambda = 1) {
+  beta_0 <- beta_vec[1]
+  beta_1 <- beta_vec[2]
+
+  # Compute emission matrix
+  E <- compute_emission_matrix(F_list, F_0, F_1, beta_0, beta_1)
+
+  # Run forward algorithm
+  result <- forward_algorithm(E, pi, A)
+
+  # Regularization term
+  reg_term <- lambda * (beta_1 - beta_0)^2
+
+  # Return regularized loss
+  return(-result$log_likelihood + reg_term)
+}
+############################
+```
+
+## Apply algorithm
+
+```{r}
+# # Pad validation set F-matrices
+# max_dim <- max(nrow(F_0), nrow(F_1))
+# pad_Fmat <- function(Fmat, target_dim) {
+#   padded <- matrix(0, nrow = target_dim, ncol = target_dim)
+#   padded[1:nrow(Fmat), 1:ncol(Fmat)] <- Fmat
+#   return(padded)
+# }
+# # pad_Fmat <- function(Fmat, target_dim) {
+# #   m <- nrow(Fmat)
+# #   if (m == target_dim) return(Fmat)
+# #   
+# #   padded <- matrix(0, nrow = target_dim, ncol = target_dim)  # define here
+# #   padded[1:m, 1:m] <- Fmat
+# #   return(padded)
+# # }
+# val_trees <- unlist(val_set, recursive = FALSE)
+# F_val_list <- lapply(val_trees, function(x) pad_Fmat(x$Fmat, max_dim))
+# F_val_list <- Filter(function(x) is.matrix(x), F_val_list)
+# 
+# # Initial guesses for beta values
+# init_beta <- c(0.001, 0.002) # beta_0, beta_1
+# 
+# set.seed(1)
+# F_val_subset <- sample(F_val_list, 5)
+# 
+# # Optimization
+# opt_result <- optim(
+#   par = init_beta,
+#   fn = neg_log_likelihood,
+#   method = "L-BFGS-B",
+#   lower = c(1e-6, 1e-6),
+#   upper = c(10, 10),
+#   F_list = F_val_list,
+#   F_0 = F_0,
+#   F_1 = F_1,
+#   pi = c(0.99, 0.01),
+#   A = A_estimated,
+#   # lambda = 1
+# )
+# 
+# print(opt_result)
+
+# Pad validation set F-matrices
+max_dim <- max(nrow(F_0), nrow(F_1))
+
+pad_Fmat <- function(Fmat, target_dim) {
+  padded <- matrix(0, nrow = target_dim, ncol = target_dim)
+  padded[1:nrow(Fmat), 1:ncol(Fmat)] <- Fmat
+  return(padded)
+}
+
+val_trees <- unlist(val_set, recursive = FALSE)
+F_val_list <- lapply(val_trees, function(x) pad_Fmat(x$Fmat, max_dim))
+F_val_list <- Filter(function(x) is.matrix(x), F_val_list)
+
+
+# Initial guesses for beta values
+init_beta <- c(0.001, 0.001)  # beta_0, beta_1
+
+# Optimization
+opt_result <- optim(
+  par = init_beta,
+  fn = neg_log_likelihood,
+  method = "L-BFGS-B",
+  lower = c(1e-6, 1e-6),
+  upper = c(10, 10),
+  F_list = F_val_list,
+  F_0 = F_0,
+  F_1 = F_1,
+  pi = c(0.99, 0.01),
+  A = A_estimated,
+  lambda = 1
+)
+
+print(opt_result)
+```
+
+## Visualize optimized output
+
+```{r}
+beta_0 <- opt_result$par[1]
+beta_1 <- opt_result$par[2]
+
+E_val <- compute_emission_matrix(F_val_list, F_0, F_1, beta_0, beta_1)
+
+hist(E_val[, 1], breaks = 50, col = "#7cc4b0", main = "P(F | Neutral)")
+hist(E_val[, 2], breaks = 50, col = "#7c9cc4", main = "P(F | Selective)")
+```
+
+```{r}
+log_ratio <- log(E_val[, 2] / E_val[, 1])
+hist(log_ratio, breaks = 50, main = "Log-likelihood ratio: log(P(F|1)/P(F|0))")
+```
+
+## Test on Test set
+
+```{r}
+beta_0 <- 0.001
+beta_1 <- 0.002
+
+max_dim <- max(nrow(F_0), nrow(F_1))
+
+pad_Fmat <- function(Fmat, target_dim) {
+  padded <- matrix(0, nrow = target_dim, ncol = target_dim)
+  padded[1:nrow(Fmat), 1:ncol(Fmat)] <- Fmat
+  return(padded)
+}
+```
+
+```{r}
+posterior_list <- list()
+
+for (i in seq_along(test_set)) {
+  chrom <- test_set[[i]]
+  
+  F_list <- lapply(chrom, function(x) pad_Fmat(x$Fmat, max_dim))
+  E <- compute_emission_matrix(F_list, F_0, F_1, beta_0, beta_1)
+
+  # Run forward-backward to get posterior probabilities
+  A <- A_estimated
+  pi <- c(0.99, 0.01)
+
+  forward_backward <- function(E, pi, A) {
+    T <- nrow(E)
+    N <- ncol(E)
+    alpha <- matrix(0, T, N)
+    beta <- matrix(0, T, N)
+    
+    # Forward pass
+    alpha[1, ] <- pi * E[1, ]
+    for (t in 2:T) {
+      for (j in 1:N) {
+        alpha[t, j] <- E[t, j] * sum(alpha[t - 1, ] * A[, j])
+      }
+    }
+    
+    # Backward pass
+    beta[T, ] <- 1
+    for (t in (T - 1):1) {
+      for (i in 1:N) {
+        beta[t, i] <- sum(A[i, ] * E[t + 1, ] * beta[t + 1, ])
+      }
+    }
+    
+    posterior <- alpha * beta
+    posterior <- posterior / rowSums(posterior)
+    return(posterior)
+  }
+
+  posterior_probs <- forward_backward(E, pi, A)
+  probs_selective <- posterior_probs[, 2]
+
+  df <- data.frame(
+    pos = sapply(chrom, function(x) (x$left + x$right) / 2),
+    prob = probs_selective,
+    chromosome = i
+  )
+
+  posterior_list[[i]] <- df
+}
+```
+
+```{r}
+posterior_df <- do.call(rbind, posterior_list)
+
+ggplot(posterior_df, aes(x = pos, y = prob, group = chromosome)) +
+  geom_point(alpha = 0.5, color = "#7c9cc4", size = 0.8) +
+  geom_vline(xintercept = 25000, color = "red") +
+  labs(
+    x = "Chromosome position",
+    y = "Posterior P(Selective)",
+    title = "Selection Probability Across Chromosomes"
+  ) +
+  theme_minimal()
+```
+
+
+
+
+
+

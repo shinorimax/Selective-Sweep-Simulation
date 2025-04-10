@@ -1,0 +1,318 @@
+---
+title: "HMM_test"
+author: "Shinnosuke Yagi"
+date: "2025-04-02"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Import libraries
+
+```{r}
+library(ape)
+library (spam)
+library (usethis)
+library (devtools)
+library (INLA)
+library (phytools)
+library(devtools)
+library(phylodyn)
+library(knitr)
+library (ggplot2)
+library(stringr)
+library(jsonlite)
+library(dplyr)
+library(reticulate)
+library(reshape2)
+library(tidyr)
+```
+
+## Load simulated data
+
+```{r}
+df <- read.csv("/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/SelectedTreesWithPositions/chrom_1.csv")
+selected_index <- which(df$left <= 25000 & df$right > 25000)  # ~25kb = selected site
+```
+
+## Add "state" column to the dataframe, indicating whether the tree position is under selection (1) or neutral (0)
+
+```{r}
+all_files <- list.files("/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/SelectedTreesWithPositions", pattern = "\\.csv$", full.names = TRUE)
+
+# Parameters
+selected_site <- 25000  # Location of selection in bp
+
+for (file in all_files) {
+  df <- read.csv(file)
+  df <- df %>%
+    mutate(state = ifelse(left <= selected_site & right > selected_site, 1, 0))
+  
+  # Overwrite the same file or save a new one
+  write.csv(df, file, row.names = FALSE)
+}
+```
+
+## Calculate $F_s$
+```{r}
+# Folder with labeled chromosome .csv files
+csv_files <- list.files("/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/SelectedTreesWithPositions", pattern = "\\.csv$", full.names = TRUE)
+
+extract_fmat <- function(newick_str) {
+  tree <- read.tree(text = newick_str)
+  fmat = gen_Fmat(tree)
+  return(fmat)
+  # tr.data <- gen.tr.data2(tree)
+  # return(tr.data$Fmat)
+}
+
+# Initialize list to collect F matrices
+fmat_list <- list()
+
+# Loop over all chromosomes
+for (file in csv_files) {
+  df <- read.csv(file)
+
+  # Select trees labeled as 'selected'
+  selected_trees <- df %>% filter(state == 1)
+
+  for (i in seq_len(nrow(selected_trees))) {
+    newick_str <- selected_trees$newick[i]
+    fmat <- extract_fmat(newick_str)
+
+    # Store only lower triangle (matrix is lower triangular by construction)
+    fmat_list[[length(fmat_list) + 1]] <- fmat
+  }
+}
+
+# Find max dimensions across all F-matrices
+max_dim <- max(sapply(fmat_list, function(x) dim(x)[1]))
+
+# Function to pad an F-matrix to max_dim × max_dim with zeros
+pad_fmat <- function(mat, target_dim) {
+  d <- dim(mat)[1]
+  if (d == target_dim) return(mat)  # already full size
+  
+  padded <- matrix(0, nrow = target_dim, ncol = target_dim)
+  padded[1:d, 1:d] <- mat
+  return(padded)
+}
+
+# Pad all F-matrices to same size
+fmat_list_aligned <- lapply(fmat_list, pad_fmat, target_dim = max_dim)
+
+# Convert to 3D array and take mean
+array_f <- simplify2array(fmat_list_aligned)
+F_s <- apply(array_f, c(1, 2), mean)
+
+# Optional: visualize
+heatmap(F_s, main = paste0("F_s (aligned average under selection, size ", max_dim, "x", max_dim, ")"))
+```
+
+## Visualize distance to $F_s$ along the chromosome
+```{r}
+# --- Safe Frobenius distance with symmetric padding ---
+pad_to_common_size <- function(F1, F2) {
+  d1 <- nrow(F1)
+  d2 <- nrow(F2)
+  target_dim <- max(d1, d2)
+
+  pad <- function(mat, target_dim) {
+    padded <- matrix(0, nrow = target_dim, ncol = target_dim)
+    padded[1:nrow(mat), 1:ncol(mat)] <- mat
+    return(padded)
+  }
+
+  list(
+    pad(F1, target_dim),
+    pad(F2, target_dim)
+  )
+}
+
+frobenius_dist <- function(tree_str, F_s) {
+  tr <- read.tree(text = tree_str)
+  F <- gen_Fmat(tr)
+
+  aligned <- pad_to_common_size(F, F_s)
+  F_aligned <- aligned[[1]]
+  Fs_aligned <- aligned[[2]]
+
+  return(sqrt(sum((F_aligned - Fs_aligned)^2)))
+}
+
+# --- Compute distances for each chromosome ---
+all_distances <- list()
+
+for (chr_index in seq_along(csv_files)) {
+  df <- read.csv(csv_files[chr_index])
+
+  distances <- numeric(nrow(df))
+  positions <- numeric(nrow(df))
+
+  for (i in seq_len(nrow(df))) {
+    distances[i] <- frobenius_dist(df$newick[i], F_s)
+    positions[i] <- (df$left[i] + df$right[i]) / 2
+  }
+
+  all_distances[[chr_index]] <- data.frame(
+    position = positions,
+    distance = distances,
+    chromosome = paste0("chr_", chr_index)
+  )
+}
+
+# --- Combine and visualize ---
+dist_df <- do.call(rbind, all_distances)
+
+ggplot(dist_df, aes(x = position, y = distance, group = chromosome)) +
+  geom_line(alpha = 0.15, color = "#336699") +
+  geom_vline(xintercept = selected_site, color = "red", linetype = "dashed", linewidth = 1) +
+  labs(
+    title = "Distance to F_s along simulated chromosomes",
+    subtitle = "Each line is one chromosome; red dashed line = selective site",
+    x = "Genomic Position (bp)",
+    y = "Frobenius Distance to F_s"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+# Reshape wide: rows = chromosome, columns = position
+heatmap_df <- dist_df %>%
+  mutate(pos_bin = floor(position / 1000) * 1000) %>%
+  group_by(chromosome, pos_bin) %>%
+  summarize(distance = mean(distance), .groups = "drop") %>%
+  pivot_wider(names_from = pos_bin, values_from = distance)
+
+# Sort column names numerically
+pos_bins <- as.integer(colnames(heatmap_df)[-1])
+ordered_indices <- order(pos_bins)
+
+heatmap_mat <- as.matrix(heatmap_df[,-1])
+heatmap_mat <- heatmap_mat[, ordered_indices]
+colnames(heatmap_mat) <- sort(pos_bins)
+rownames(heatmap_mat) <- heatmap_df$chromosome
+
+# Step 1: Heatmap
+heatmap_out <- heatmap(heatmap_mat, Rowv = NA, Colv = NA, scale = "none", 
+                       col = colorRampPalette(c("white", "blue"))(100),
+                       xlab = "Position bin", ylab = "Chromosomes",
+                       keep.dendro = TRUE)
+
+# Step 2: Find column index of 25k
+bin_pos <- 25000
+col_bins <- as.integer(colnames(heatmap_mat))
+target_col <- which(col_bins == bin_pos)
+
+# Step 3: Add vertical dashed red line
+col_order <- heatmap_out$colInd
+line_x <- which(col_order == target_col)
+abline(v = line_x + 0.5, col = "red", lwd = 2, lty = 2)
+```
+
+## Construct $F_n$
+```{r}
+# --- Parameters ---
+distance_cutoff <- 25000  # Keep trees with position > 50000
+selected_site <- 25000
+csv_files <- list.files(
+  "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/SelectedTreesWithPositions",
+  pattern = "\\.csv$",
+  full.names = TRUE
+)
+
+# --- Helper: compute Frobenius matrix ---
+gen_safe_fmat <- function(tree_str) {
+  tr <- read.tree(text = tree_str)
+  F <- gen_Fmat(tr)
+  return(F)
+}
+
+# --- Step 1: Extract neutral trees ---
+fmat_list <- list()
+tree_count <- 0  # for progress message
+
+# Count total number of neutral trees first (for the progress bar)
+neutral_tree_total <- 0
+for (file in csv_files) {
+  df <- read.csv(file)
+  df$position <- (df$left + df$right) / 2
+  neutral_tree_total <- neutral_tree_total + sum(df$position > (selected_site + distance_cutoff))
+}
+
+pb <- txtProgressBar(min = 0, max = neutral_tree_total, style = 3)
+
+for (file in csv_files) {
+  df <- read.csv(file)
+  df$position <- (df$left + df$right) / 2
+  neutral_trees <- df %>% filter(position > (selected_site + distance_cutoff))
+
+  for (i in seq_len(nrow(neutral_trees))) {
+    tree_str <- neutral_trees$newick[i]
+
+    fmat <- tryCatch({
+      gen_safe_fmat(tree_str)
+    }, error = function(e) NULL)
+
+    if (!is.null(fmat)) {
+      fmat_list[[length(fmat_list) + 1]] <- fmat
+    }
+
+    tree_count <- tree_count + 1
+    setTxtProgressBar(pb, tree_count)
+  }
+}
+
+close(pb)
+cat("\nDone. Collected", length(fmat_list), "neutral trees.\n")
+
+# --- Step 2: Pad to common shape ---
+max_dim <- max(sapply(fmat_list, function(x) dim(x)[1]))
+
+pad_fmat <- function(mat, target_dim) {
+  padded <- matrix(0, nrow = target_dim, ncol = target_dim)
+  padded[1:nrow(mat), 1:ncol(mat)] <- mat
+  return(padded)
+}
+
+fmat_aligned <- lapply(fmat_list, pad_fmat, target_dim = max_dim)
+
+# --- Step 3: Compute average to get F_n ---
+array_f <- simplify2array(fmat_aligned)
+F_n <- apply(array_f, c(1, 2), mean)
+```
+```{r}
+# Add correct numeric labels
+dim_labels <- as.character(seq_len(nrow(F_n)))
+rownames(F_n) <- rev(dim_labels)  # flip row order
+colnames(F_n) <- dim_labels       # normal column order
+
+# Optional: visualize
+heatmap(F_n,
+        Rowv = NA, Colv = NA, scale = "none",
+        col = colorRampPalette(c("white", "blue"))(100),
+        xlab = "Time index", ylab = "Time index",
+        main = paste0("F_n (neutral reference, ", length(fmat_aligned), " trees)"))
+```
+```{r}
+# Add correct numeric labels
+dim_labels <- as.character(seq_len(nrow(F_s)))
+rownames(F_s) <- rev(dim_labels)  # flip row order
+colnames(F_s) <- dim_labels       # normal column order
+
+# Optional: visualize
+heatmap(F_s,
+        Rowv = NA, Colv = NA, scale = "none",
+        col = colorRampPalette(c("white", "blue"))(100),
+        xlab = "Time index", ylab = "Time index",
+        main = paste0("F_n (neutral reference, ", length(fmat_aligned), " trees)"))
+```
+
+
+
+
+
+
+
