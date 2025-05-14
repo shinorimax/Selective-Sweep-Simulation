@@ -213,14 +213,14 @@ if __name__ == "__main__":
     # ############################
     # # Run Multiple Simulations #
     # ############################
-    # selection_scenario = [0.001, 0.01, 0.1, 0]
-    # Ne = int(1e4)
-    # L = int(1e5)
-    # num_samples = 10
-    # num_simulations = 300
-    # num_sweeps = 1
-    # recombination_rate = 1.25 * 1e-8
-    # log_setting = [(1, 0), (1, 1), (1, 2)]
+    selection_scenario = [0.001, 0.01, 0.1, 0]
+    Ne = int(1e4)
+    L = int(1e5)
+    num_samples = 10
+    num_simulations = 300
+    num_sweeps = 1
+    recombination_rate = 1.25 * 1e-8
+    log_setting = [(1, 0), (1, 1), (1, 2)]
     
     # Simulate multiple sweeps
     # # output_file = simulate_multiple_sweeps(
@@ -252,16 +252,16 @@ if __name__ == "__main__":
     #########################################
 
     # Define parameters
-    Ne = int(1e4)  # Effective population size
-    L = int(1e5)  # Chromosome length
-    num_samples = 10  # Number of samples
-    selection_scenario = 0.1  # Example selection coefficient
+    # Ne = int(1e4)  # Effective population size
+    # L = int(1e5)  # Chromosome length
+    # num_samples = 10  # Number of samples
+    # selection_scenario = 0.1  # Example selection coefficient
 
-    # Run the simulation
-    ts = run_simple_simulation(selection_scenario, Ne, L, num_samples)
+    # # Run the simulation
+    # ts = run_simple_simulation(selection_scenario, Ne, L, num_samples)
 
-    # Save the visualization to an SVG file
-    with open("tree_sequence.svg", "w") as f:
-        f.write(ts.draw_svg(y_axis=True))
+    # # Save the visualization to an SVG file
+    # with open("tree_sequence.svg", "w") as f:
+    #     f.write(ts.draw_svg(y_axis=True))
 
-    print("SVG saved as tree_sequence.svg. Open the file to view the visualization.")
+    # print("SVG saved as tree_sequence.svg. Open the file to view the visualization.")
