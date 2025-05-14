@@ -1,0 +1,77 @@
+---
+title: "two_sample_test"
+author: "Shinnosuke Yagi"
+date: "2025-05-14"
+output: html_document
+---
+
+```{r}
+library(ape)
+library(spam)
+library(usethis)
+library(devtools)
+library(INLA)
+library(phytools)
+library(devtools)
+library(phylodyn)
+library(knitr)
+library(ggplot2)
+library(stringr)
+library(jsonlite)
+library(dplyr)
+library(reticulate)
+library(reshape2)
+library(tidyr)
+```
+
+
+Load data, extract genealogies at selective site (index 2) and a fixed neutral site (index 3). Convert to F-matrices and make a list.
+
+```{r}
+# ---- Step 1: Read the JSON ----
+# Replace with your actual path
+json_path <- "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_sample_results/results_Ne_10000_L_100000_samples_25.json"
+tree_data <- fromJSON(json_path)
+
+# ---- Step 2: Select the appropriate tree set ----
+# You may need to adjust the key if it differs
+trees_list <- tree_data[["selection_scenario_0.01"]]
+
+# ---- Step 3: Initialize output lists ----
+selective_fmats <- list()
+neutral_fmats <- list()
+
+# ---- Step 4: Loop over entries and convert to F-matrix ----
+for (i in 1:nrow(trees_list)) {
+  entry <- trees_list[[i]]
+  
+  selective_newick <- trees_list[i, 2]  # 2nd tree = selective site
+  neutral_newick   <- trees_list[i, 3]  # 3rd tree = neutral site
+
+  # Parse and convert
+  sel_tree <- read.tree(text = selective_newick)
+  neu_tree <- read.tree(text = neutral_newick)
+  
+  # Apply gen_Fmat
+  sel_fmat <- gen_Fmat(sel_tree)
+  neu_fmat <- gen_Fmat(neu_tree)
+  
+  # Store
+  selective_fmats[[length(selective_fmats) + 1]] <- sel_fmat
+  neutral_fmats[[length(neutral_fmats) + 1]] <- neu_fmat
+}
+
+# Optional: check lengths
+length(selective_fmats)
+length(neutral_fmats)
+```
+
+
+```{r}
+install.packages("fmatrix")
+
+source("dist_based_test.R")
+```
+
+
+
