@@ -5,6 +5,12 @@ date: "2025-05-14"
 output: html_document
 ---
 
+
+```{r}
+library(devtools)
+install_github("RSamyak/fmatrix")
+```
+
 ```{r}
 library(ape)
 library(spam)
@@ -68,10 +74,174 @@ length(neutral_fmats)
 
 
 ```{r}
-install.packages("fmatrix")
-
-source("dist_based_test.R")
+all_fmats <- c(selective_fmats, neutral_fmats)
 ```
+
+```{r}
+max_dim <- max(sapply(all_fmats, function(x) dim(x)[1]))
+```
+
+
+```{r}
+pad_fmat <- function(mat, target_dim) {
+  d <- dim(mat)[1]
+  if (d == target_dim) return(mat)
+  
+  padded <- matrix(0, nrow = target_dim, ncol = target_dim)
+  padded[1:d, 1:d] <- mat
+  return(padded)
+}
+
+# Apply to both sets
+selective_fmats_padded <- lapply(selective_fmats, pad_fmat, target_dim = max_dim)
+neutral_fmats_padded   <- lapply(neutral_fmats,   pad_fmat, target_dim = max_dim)
+```
+
+
+```{r}
+selective_mat <- t(sapply(selective_fmats_padded, as.vector))
+neutral_mat   <- t(sapply(neutral_fmats_padded, as.vector))
+```
+
+
+```{r}
+#simulates F matrices from BD, uniform or aldous models
+#what is the BF distribution?
+gen_x <- function(b, m = 100, n = 7, ...){
+  x <- rEncod(m = m, n = n, b = b, ...)
+  x <- lapply(x, Fmat_from_myencod)
+  x <- matrix_list(x)
+  x <- t(x)
+  x
+}
+
+#computes the euclidean distance
+dist_x_mu <- function(x,mu){
+  diff <- (t(x) - mu)
+  distribution <-  apply(diff, 2, function(u){sum(u**2)})
+  return(distribution)
+}
+
+#Two-sample Kolmogorov-Smirnov statistic, difference between the two empirical distributions
+KSstat <- function(x, y){
+  ## This portion of code extracted from stat::ks.test
+  n.x <- length(x)
+  n.y <- length(y)
+  w <- c(x, y)
+  z <- cumsum(ifelse(order(w) <= n.x, 1/n.x, -1/n.y))
+
+  if (length(unique(w)) < (n.x + n.y)) {
+    z <- z[c(which(diff(sort(w)) != 0), n.x + n.y)]
+  }
+
+  max(abs(z))
+}
+
+
+cdf<-function(u,x){
+  return(sum(x<u)/length(x))
+}
+
+KSstat2 <- function(x, y){
+  ## This portion of code extracted from stat::ks.test
+  n.x <- length(x)
+  n.y <- length(y)
+  w <- c(x, y)
+  u<-unique(sort(w))
+  for (i in 1:length(u))
+  z<-sapply(1:length(u),function(i){cdf(u[i],x)})-sapply(1:length(u),function(i){cdf(u[i],y)})
+  #z <- cumsum(ifelse(order(w) <= n.x, 1/n.x, -1/n.y))
+  
+  #if (length(unique(w)) < (n.x + n.y)) {
+   # z <- z[c(which(diff(sort(w)) != 0), n.x + n.y)]
+  #}
+  
+ return(max(abs(z)))
+}
+#
+
+pvalue <- function(stat, x, B = 5e3, verbose = TRUE){
+  n <- length(x)
+  cdf <- rank(x)/n
+
+  freq <- 1/n
+
+  pval <- 0
+  if(verbose) cat("simulating brownian bridge processes\n")
+  for(i in 1:B){
+    if(verbose) cat("\r", i)
+    gen <- e1071::rbridge(end = 1, frequency = 1/freq)
+    pval <- (i-1)/i*pval + 1/i*(max(abs(gen)) >= stat)
+  }
+  if(verbose) cat("\ndone!\n")
+  return(pval)
+}
+
+alt_pvalue<-function(stat,x){
+  n <- length(x)
+  cdf <- rank(x)/n
+  
+  freq <- 1/n
+  
+  pval <- 0
+  if(verbose) cat("simulating brownian bridge processes\n")
+  for(i in 1:B){
+    if(verbose) cat("\r", i)
+    gen <- e1071::rbridge(end = 1, frequency = 1/freq)
+    pval <- (i-1)/i*pval + 1/i*(max(abs(gen)) >= stat)
+  }
+}
+
+myHotelling <- function(x, y, ...){
+  o1 <- apply(x, 2, sd) == 0
+  o2 <- apply(y, 2, sd) == 0
+  o3 <- apply(x, 2, mean) == apply(y, 2, mean)
+
+  o <- which(o1 & o2 & o3)
+
+  try({
+    ret <- ICSNP::HotellingsT2(x[,-o], y[,-o], ...)$p.value < 0.05
+    return(ret)
+  })
+
+  return(NA)
+}
+
+# Main test function
+newTest <- function(x, y, flag = "test", B = 5000, verbose = TRUE){
+  n.x <- nrow(x)
+  n.y <- nrow(y)
+
+  mu_x <- colMeans(x)
+  mu_y <- colMeans(y)
+
+  distxx <- dist_x_mu(x, mu_x)
+  distxy <- dist_x_mu(x, mu_y)
+  distyx <- dist_x_mu(y, mu_x)
+  distyy <- dist_x_mu(y, mu_y)
+
+  STATISTIC <- 0.5 * sqrt(n.x * n.y / (n.x + n.y)) * 
+    (KSstat2(distxx, distyx) + KSstat2(distxy, distyy))
+
+  if(flag == "stat") return(STATISTIC)
+
+  w <- rbind(x, y)
+  mu_w <- apply(w, 2, mean)
+  
+  distww <- dist_x_mu(w, mu_w)
+  pval <- pvalue(STATISTIC, distww, verbose = FALSE)
+  return(list(pval=pval, Statistic=STATISTIC))
+}
+```
+
+
+
+```{r}
+result <- newTest(selective_mat, neutral_mat, B = 10000, verbose = TRUE)
+print(result)
+```
+
+
 
 
 
