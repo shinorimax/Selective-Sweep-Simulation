@@ -240,7 +240,9 @@ newTest <- function(x, y, flag = "test", B = 5000, verbose = TRUE){
 result <- newTest(selective_mat, neutral_mat, B = 10000, verbose = TRUE)
 print(result)
 ```
-
+```{r}
+print(result$Statistic)
+```
 
 
 

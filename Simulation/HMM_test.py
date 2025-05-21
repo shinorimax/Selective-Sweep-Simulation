@@ -7,12 +7,14 @@ from tqdm import tqdm
 Ne = 10_000
 L = int(1e5)
 num_samples = 25
-num_simulations = 300
+num_simulations = 100
 selection_s = 0.01
 recomb_rate = 1.25e-8
 mut_loc = int(L / 4)
 
-output_dir = "Results/SelectedTreesWithPositions"
+base_dir = "Results/Two_Sample_Test_Naive"
+folder_name = f"Ne_{Ne}_L_{L}_samples_{num_samples}_s_{selection_s}_recomb_{recomb_rate}"
+output_dir = os.path.join(base_dir, folder_name)
 os.makedirs(output_dir, exist_ok=True)
 
 def select_scenario(s, Ne, pos):
