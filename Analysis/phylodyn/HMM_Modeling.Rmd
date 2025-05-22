@@ -33,7 +33,7 @@ library(tidyr)
 ## Add "state" column to the dataframe, indicating whether the tree position is under selection (1) or neutral (0)
 
 ```{r}
-all_files <- list.files("/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/SelectedTreesWithPositions", pattern = "\\.csv$", full.names = TRUE)
+all_files <- list.files("/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_ARG", pattern = "\\.csv$", full.names = TRUE)
 
 # Parameters
 selected_site <- 25000  # Location of selection in bp
@@ -96,7 +96,7 @@ for (file_index in seq_along(all_files)) {
 ```
 
 ```{r}
-saveRDS(all_chromosomes, "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/SelectedTreesWithPositions/all_chromosomes_grouped.rds")
+saveRDS(all_chromosomes, "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_ARG/all_chromosomes_grouped.rds")
 ```
 
 ```{r}
@@ -141,7 +141,7 @@ for (file_index in seq_along(all_files)) {
 # Save with genomic positions now included
 saveRDS(
   all_trees,
-  file = "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/all_trees_with_Fmat.rds"
+  file = "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_ARG/all_trees_with_Fmat.rds"
 )
 
 message(sprintf("✅ Done! Total trees processed: %d", counter))
@@ -318,7 +318,7 @@ pad_Fmat <- function(Fmat, target_dim) {
 F_val_list <- lapply(unlist(val_set, recursive = FALSE), function(x) pad_Fmat(x$Fmat, max_dim))
 
 # Example: compute emission matrix with current beta values
-E_val <- compute_emission_matrix(F_val_list, F_0, F_1, beta_0 = 0.001, beta_1 = 0.002)
+E_val <- compute_emission_matrix(F_val_list, F_0, F_1, beta_0 = 0.001, beta_1 = 0.0005)
 ```
 
 ## Visualize E_val statistics
@@ -380,23 +380,7 @@ forward_algorithm <- function(E, pi, A) {
 
 ```{r}
 # ### Original ###
-# neg_log_likelihood <- function(beta_vec, F_list, F_0, F_1, pi, A) {
-#   beta_0 <- beta_vec[1]
-#   beta_1 <- beta_vec[2]
-# 
-#   # Compute emission matrix
-#   E <- compute_emission_matrix(F_list, F_0, F_1, beta_0, beta_1)
-# 
-#   # Run forward algorithm
-#   result <- forward_algorithm(E, pi, A)
-# 
-#   # Return negative log-likelihood
-#   return(-result$log_likelihood)
-# }
-# ################
-
-### With Regularization ###
-neg_log_likelihood <- function(beta_vec, F_list, F_0, F_1, pi, A, lambda = 1) {
+neg_log_likelihood <- function(beta_vec, F_list, F_0, F_1, pi, A) {
   beta_0 <- beta_vec[1]
   beta_1 <- beta_vec[2]
 
@@ -406,12 +390,28 @@ neg_log_likelihood <- function(beta_vec, F_list, F_0, F_1, pi, A, lambda = 1) {
   # Run forward algorithm
   result <- forward_algorithm(E, pi, A)
 
-  # Regularization term
-  reg_term <- lambda * (beta_1 - beta_0)^2
-
-  # Return regularized loss
-  return(-result$log_likelihood + reg_term)
+  # Return negative log-likelihood
+  return(-result$log_likelihood)
 }
+# ################
+
+### With Regularization ###
+# neg_log_likelihood <- function(beta_vec, F_list, F_0, F_1, pi, A, lambda = 1) {
+#   beta_0 <- beta_vec[1]
+#   beta_1 <- beta_vec[2]
+# 
+#   # Compute emission matrix
+#   E <- compute_emission_matrix(F_list, F_0, F_1, beta_0, beta_1)
+# 
+#   # Run forward algorithm
+#   result <- forward_algorithm(E, pi, A)
+# 
+#   # Regularization term
+#   reg_term <- lambda * (beta_1 - beta_0)^2
+# 
+#   # Return regularized loss
+#   return(-result$log_likelihood + reg_term)
+# }
 ############################
 ```
 
@@ -489,7 +489,7 @@ opt_result <- optim(
   F_1 = F_1,
   pi = c(0.99, 0.01),
   A = A_estimated,
-  lambda = 1
+  # lambda = 1
 )
 
 print(opt_result)
@@ -515,8 +515,8 @@ hist(log_ratio, breaks = 50, main = "Log-likelihood ratio: log(P(F|1)/P(F|0))")
 ## Test on Test set
 
 ```{r}
-beta_0 <- 0.001
-beta_1 <- 0.002
+beta_0 <- 0.002
+beta_1 <- 0.001
 
 max_dim <- max(nrow(F_0), nrow(F_1))
 
@@ -538,7 +538,7 @@ for (i in seq_along(test_set)) {
 
   # Run forward-backward to get posterior probabilities
   A <- A_estimated
-  pi <- c(0.99, 0.01)
+  pi <- c(0.95, 0.05)
 
   forward_backward <- function(E, pi, A) {
     T <- nrow(E)
