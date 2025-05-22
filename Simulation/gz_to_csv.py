@@ -38,8 +38,8 @@ def parse_smc_file(file_path, output_csv_path):
 
 # Run the script for all .smc.gz files
 for i in range(0, 1001, 10):
-    smc_path = f"/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_ARG/run1.{i}.smc.gz"
-    csv_path = f"/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_ARG/trees_run1.{i}.csv"
+    smc_path = f"/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_ARG_0.1/run1.{i}.smc.gz"
+    csv_path = f"/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_ARG_0.1/trees_run1.{i}.csv"
     if os.path.exists(smc_path):
         print(f"Processing {smc_path} → {csv_path}")
         parse_smc_file(smc_path, csv_path)

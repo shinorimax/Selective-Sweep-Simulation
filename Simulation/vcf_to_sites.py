@@ -2,8 +2,8 @@ from cyvcf2 import VCF
 import sys
 
 # === INPUT AND OUTPUT ===
-input_vcf = "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_ARG/simulated_data.vcf"         # change this path if needed
-output_sites = "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_ARG/simulated_data.sites"    # desired output path
+input_vcf = "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_ARG_0.1/simulated_data.vcf"         # change this path if needed
+output_sites = "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_ARG_0.1/simulated_data.sites"    # desired output path
 
 
 def parse_vcf(vcf_path, output_path, chrom="chr", region_start=1, region_end=100000):

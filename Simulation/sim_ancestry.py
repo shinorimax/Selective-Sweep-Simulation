@@ -5,7 +5,7 @@ import os
 Ne = 10_000
 L = int(1e5)
 num_samples = 25
-selection_s = 0.01
+selection_s = 0.1
 recomb_rate = 1.25e-8
 mut_rate = 1e-8
 mut_loc = int(L / 4)  # 25_000
@@ -25,7 +25,7 @@ ts = msprime.sim_ancestry(
     sequence_length=L,
     recombination_rate=recomb_rate,
     population_size=Ne,
-    model=[sweep],
+    model=[sweep, msprime.StandardCoalescent()],
     random_seed=42,
 )
 
@@ -33,17 +33,17 @@ ts = msprime.sim_ancestry(
 mutated_ts = msprime.sim_mutations(ts, rate=mut_rate, random_seed=43)
 
 # Export to VCF format for ARGweaver
-os.makedirs("Results/Two_Sample_Test_ARG", exist_ok=True)
-with open("Results/Two_Sample_Test_ARG/simulated_data.vcf", "w") as vcf_file:
+os.makedirs("Results/Two_Sample_Test_ARG_0.1", exist_ok=True)
+with open("Results/Two_Sample_Test_ARG_0.1/simulated_data.vcf", "w") as vcf_file:
     mutated_ts.write_vcf(vcf_file)
     # Export to .sites format for ARGweaver
-with open("Results/Two_Sample_Test_ARG/simulated_data.sites", "w") as f:
-    print("NAMES", " ".join(mutated_ts.individual(i).metadata.get("name", f"tsk_{i}")
-                           for i in range(mutated_ts.num_samples)), file=f)
-    print("REGION 0", int(mutated_ts.sequence_length), file=f)
-    print("SITES", file=f)
+# with open("Results/Two_Sample_Test_ARG_0.1/simulated_data.sites", "w") as f:
+#     print("NAMES", " ".join(mutated_ts.individual(i).metadata.get("name", f"tsk_{i}")
+#                            for i in range(mutated_ts.num_samples)), file=f)
+#     print("REGION 0", int(mutated_ts.sequence_length), file=f)
+#     print("SITES", file=f)
 
-    for var in mutated_ts.variants():
-        alleles = var.alleles
-        assert len(alleles) == 2  # Ensure biallelic
-        print(var.site.position, *var.genotypes, sep="\t", file=f)
+#     for var in mutated_ts.variants():
+#         alleles = var.alleles
+#         assert len(alleles) == 2  # Ensure biallelic
+#         print(var.site.position, *var.genotypes, sep="\t", file=f)

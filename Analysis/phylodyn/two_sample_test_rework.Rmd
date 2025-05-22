@@ -41,7 +41,7 @@ library(tidyr)
 ```{r}
 #all_files <- list.files("/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_Naive/Ne_10000_L_100000_samples_25_s_0.01_recomb_1.25e-08", pattern = "\\.csv$", full.names = TRUE)
 
-all_files <- list.files("/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_ARG", pattern = "\\.csv$", full.names = TRUE)
+all_files <- list.files("/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_ARG_0.1", pattern = "\\.csv$", full.names = TRUE)
 
 # Parameters
 selected_site <- 25000  # Location of selection in bp
@@ -221,19 +221,20 @@ newTest <- function(x, y, flag = "test", B = 5000, verbose = TRUE){
 Fro each grid loc, extract 100 trees on that loc on each of the 100 chromosomes. Then, two sample test the two distribution.
 
 ```{r}
-num_steps <- length(finest_grid) - 1
+# num_steps <- length(finest_grid) - 1
 
 # Initialize a list to store results
 results_list <- list()
 
-for (i in 1:(length(finest_grid) - 1)) {
+# for (i in 1:(length(finest_grid) - 1)) {
   
-
-  first_loc <- finest_grid[i]
-  second_loc <- finest_grid[(i + 1)]
+for (i in 1:19) {
   
-  # first_loc <- i * 1000
-  # second_loc <- (i + 1) * 1000
+  # first_loc <- finest_grid[i]
+  # second_loc <- finest_grid[(i + 1)]
+  
+  first_loc <- i * 5000
+  second_loc <- (i + 1) * 5000
   
   # Hold F-matrices for this interval
   fmats_first <- list()
@@ -311,3 +312,6 @@ ggplot(results_df, aes(x = first_loc, y = statistic)) +
   theme_minimal()
 ```
 
+```{r}
+write.csv(results_df, file = "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_ARG_0.1/results.csv", row.names = FALSE)
+```
