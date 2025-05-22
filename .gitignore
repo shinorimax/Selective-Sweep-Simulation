@@ -12,6 +12,7 @@
 Results/
 Images/
 1000genomes/
+argweaver/
 
 # Exclude Python virtual environments
 venv/
