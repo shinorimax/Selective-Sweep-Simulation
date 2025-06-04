@@ -41,7 +41,7 @@ library(tidyr)
 ```{r}
 #all_files <- list.files("/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_Naive/Ne_10000_L_100000_samples_25_s_0.01_recomb_1.25e-08", pattern = "\\.csv$", full.names = TRUE)
 
-all_files <- list.files("/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_ARG_0.1", pattern = "\\.csv$", full.names = TRUE)
+all_files <- list.files("/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_ARG_0.1/CSVs_run2", pattern = "\\.csv$", full.names = TRUE)
 
 # Parameters
 selected_site <- 25000  # Location of selection in bp

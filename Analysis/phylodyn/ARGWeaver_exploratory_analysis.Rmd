@@ -1,0 +1,152 @@
+---
+title: "ARGWeaver_exploratory_analysis"
+author: "Shinnosuke Yagi"
+date: "2025-05-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library (ape)
+library (spam)
+library (usethis)
+library (devtools)
+library (INLA)
+library (phytools)
+library(devtools)
+library(phylodyn)
+library(knitr)
+library (ggplot2)
+library(stringr)
+library(jsonlite)
+library(dplyr)
+library(ggpubr)
+library(boot)
+library(progress)
+```
+
+```{r}
+all_files <- list.files("/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_ARG_0.1/CSVs_run2", pattern = "\\.csv$", full.names = TRUE)
+
+# Parameters
+selected_site <- 25000  # Location of selection in bp
+
+for (file in all_files) {
+  df <- read.csv(file)
+  df <- df %>%
+    mutate(state = ifelse(left <= selected_site & right > selected_site, 1, 0))
+  
+  # Overwrite the same file or save a new one
+  write.csv(df, file, row.names = FALSE)
+}
+```
+
+```{r}
+clean_and_jitter_tree <- function(s, epsilon = 0.1) {
+  # Step 1: Clean Newick
+  s_clean <- clean_newick(s)
+
+  # Step 2: Try reading tree
+  tree <- tryCatch(read.tree(text = s_clean), error = function(e) return(NULL))
+  if (is.null(tree)) return(NULL)
+
+  # Step 3: Jitter node heights
+  depths <- node.depth.edgelength(tree)
+  internal_nodes <- unique(tree$edge[,2][tree$edge[,2] > length(tree$tip.label)])
+
+  for (node in internal_nodes) {
+    depths[node] <- depths[node] + runif(1, epsilon, 2 * epsilon)
+  }
+
+  if (any(duplicated(round(depths, 6)))) return(NULL)
+
+  # Step 4: Recompute edge lengths
+  tree <- tryCatch(compute.brlen(tree, depth = depths), error = function(e) return(NULL))
+  return(tree)
+}
+```
+
+
+```{r}
+# Parameters
+selected_site <- 25000
+site3 <- 75000
+
+# Load files
+all_files <- list.files(
+  "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_ARG_0.1/CSVs_run2",
+  pattern = "\\.csv$", full.names = TRUE
+)
+
+# Storage
+trees_by_type <- list(type1 = list(), type2 = list(), type3 = list(), type4 = list())
+
+# Extract trees
+for (file in all_files) {
+  df <- read.csv(file)
+  
+  # Type 1: tree that contains selected site (e.g., 25000 bp)
+  type1_idx <- which(df$left <= selected_site & df$right > selected_site)[1]
+  type1 <- df[type1_idx, ]
+  
+  # Type 2: the tree *right after* Type 1 in the file
+  type2_idx <- min(type1_idx + 1, nrow(df))  # Avoid out-of-bounds
+  type2 <- df[type2_idx, ]
+  
+  # Type 3: tree that contains 75000 bp
+  type3_idx <- which(df$left <= site3 & df$right > site3)[1]
+  type3 <- df[type3_idx, ]
+  
+  # Type 4: last tree
+  type4 <- df[nrow(df), ]
+
+  # Append newick strings
+  trees_by_type$type1[[length(trees_by_type$type1) + 1]] <- type1$newick
+  trees_by_type$type2[[length(trees_by_type$type2) + 1]] <- type2$newick
+  trees_by_type$type3[[length(trees_by_type$type3) + 1]] <- type3$newick
+  trees_by_type$type4[[length(trees_by_type$type4) + 1]] <- type4$newick
+}
+
+# Compute distances
+plot_data <- data.frame()
+
+for (i in 1:4) {
+  cat("Processing: type", i, "\n")
+  tree_type_name <- paste0("type", i)
+  newick_strings <- unlist(trees_by_type[[tree_type_name]])
+  
+  # Parse Newick strings, clean, read, and jitter edge lengths
+  tree_list <- lapply(newick_strings, function(s) {
+    s_clean <- gsub("\\[&&[^\\]]*\\]", "", s)  # Naive tag removal
+    tree <- read.tree(text = s_clean)
+  
+    # Naive jitter: slightly perturb edge lengths
+    tree$edge.length <- tree$edge.length + runif(length(tree$edge.length), 1e-6, 1e-5)
+    return(tree)
+  })
+
+  # Compute distance matrix
+  dmat <- dist_matrix(tree_list, "l2", FALSE)
+  dist_vec <- dmat[upper.tri(dmat)]
+
+  plot_data <- rbind(
+    plot_data,
+    data.frame(TreeType = as.factor(i), Distance = dist_vec)
+  )
+}
+
+# Plot
+ggplot(plot_data, aes(x = Distance, fill = TreeType)) +
+  geom_histogram(alpha = 0.6, position = "identity", bins = 50) +
+  theme_minimal() +
+  labs(
+    title = "Pairwise Tree Distance Distributions (0.1 Selection Coefficient)",
+    x = "Pairwise Distance", y = "Count", fill = "Tree Type"
+  )
+```
+
+

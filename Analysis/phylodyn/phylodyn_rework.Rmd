@@ -610,129 +610,193 @@ l2w_cm
 
 Plot distribution of pairwise distances (l1uw)
 ```{r}
-# Loop through scenarios and simulations to compute pairwise distances
+# Coefficient values for scenarios 1–4
+select_coef <- c("0.001", "0.01", "0.1", "0")
+
+# Define the plotting order: 4 → 1 → 2 → 3
+plot_order <- c(4, 1, 2, 3)
+
 plot_data <- data.frame()
 
-# Loop through scenarios and simulations to compute pairwise distances
-par(mfrow = c(2, 2))  # Arrange plots in a 2x2 grid
-for (i in seq_along(scenarios)) {
-  scenario_number <- as.character(i)
+for (i in plot_order) {
   scenario_data <- scenarios[[i]][1:50]
+  coef_label <- select_coef[i]  # This correctly maps i to its coefficient
+  cat("Processing Scenario", i, " (Selection Coefficient", coef_label, ")\n")
   
-  for (tree_type in 1:4) {  # Loop over tree types
+  for (tree_type in 1:4) {
     tree_distances <- lapply(scenario_data, function(sim) sim[[tree_type]])
-    # dmat_list <- lapply(tree_distances, dist_matrix)
     dmat_list <- dist_matrix(tree_distances, "l1", FALSE)
-    
-    # Extract upper triangular part of distance matrices
     list_d <- dmat_list[upper.tri(dmat_list)]
     
-    # Store data for ggplot
-    plot_data <- rbind(plot_data, data.frame(Scenario = paste("Scenario ", scenario_number), TreeType = as.factor(tree_type), Distance = list_d))
+    plot_data <- rbind(
+      plot_data,
+      data.frame(
+        Scenario = paste("Selection Coefficient", coef_label),
+        TreeType = as.factor(tree_type),
+        Distance = list_d
+      )
+    )
   }
 }
 
-# Plot using ggplot
+# Explicitly set the factor level order for correct facet display
+plot_data$Scenario <- factor(
+  plot_data$Scenario,
+  levels = paste("Selection Coefficient", select_coef[plot_order])
+)
+
+# Final plot
 ggplot(plot_data, aes(x = Distance, fill = TreeType)) +
   geom_histogram(alpha = 0.6, position = "identity", bins = 50) +
-  facet_wrap(~Scenario) +
+  facet_wrap(~Scenario, ncol = 2) +
   theme_minimal() +
-  labs(title = "Pairwise Tree Distance Distributions (l1, unweighted)", x = "Pairwise Distance", y = "Density", fill = "Tree Type")
+  labs(
+    title = "Pairwise Tree Distance Distributions (l1, unweighted)",
+    x = "Pairwise Distance", y = "Density", fill = "Tree Type"
+  )
 ```
 Plot distribution of pairwise distances (l1w)
 ```{r}
-# Loop through scenarios and simulations to compute pairwise distances
+# Coefficient values for scenarios 1–4
+select_coef <- c("0.001", "0.01", "0.1", "0")
+
+# Define the plotting order: 4 → 1 → 2 → 3
+plot_order <- c(4, 1, 2, 3)
+
 plot_data <- data.frame()
 
-# Loop through scenarios and simulations to compute pairwise distances
-par(mfrow = c(2, 2))  # Arrange plots in a 2x2 grid
-for (i in seq_along(scenarios)) {
-  scenario_number <- as.character(i)
+for (i in plot_order) {
   scenario_data <- scenarios[[i]][1:50]
+  coef_label <- select_coef[i]  # This correctly maps i to its coefficient
+  cat("Processing Scenario", i, " (Selection Coefficient", coef_label, ")\n")
   
-  for (tree_type in 1:4) {  # Loop over tree types
+  for (tree_type in 1:4) {
     tree_distances <- lapply(scenario_data, function(sim) sim[[tree_type]])
-    # dmat_list <- lapply(tree_distances, dist_matrix)
     dmat_list <- dist_matrix(tree_distances, "l1", TRUE)
-    
-    # Extract upper triangular part of distance matrices
     list_d <- dmat_list[upper.tri(dmat_list)]
     
-    # Store data for ggplot
-    plot_data <- rbind(plot_data, data.frame(Scenario = paste("Scenario ", scenario_number), TreeType = as.factor(tree_type), Distance = list_d))
+    plot_data <- rbind(
+      plot_data,
+      data.frame(
+        Scenario = paste("Selection Coefficient", coef_label),
+        TreeType = as.factor(tree_type),
+        Distance = list_d
+      )
+    )
   }
 }
 
-# Plot using ggplot
+# Explicitly set the factor level order for correct facet display
+plot_data$Scenario <- factor(
+  plot_data$Scenario,
+  levels = paste("Selection Coefficient", select_coef[plot_order])
+)
+
+# Final plot
 ggplot(plot_data, aes(x = Distance, fill = TreeType)) +
   geom_histogram(alpha = 0.6, position = "identity", bins = 50) +
-  facet_wrap(~Scenario) +
+  facet_wrap(~Scenario, ncol = 2) +
   theme_minimal() +
-  labs(title = "Pairwise Tree Distance Distributions (l1, weighted)", x = "Pairwise Distance", y = "Density", fill = "Tree Type")
+  labs(
+    title = "Pairwise Tree Distance Distributions (l1, weighted)",
+    x = "Pairwise Distance", y = "Density", fill = "Tree Type"
+  )
 ```
 
 Plot distribution of pairwise distances (l2uw)
 ```{r}
-# Loop through scenarios and simulations to compute pairwise distances
+# Coefficient values for scenarios 1–4
+select_coef <- c("0.001", "0.01", "0.1", "0")
+
+# Define the plotting order: 4 → 1 → 2 → 3
+plot_order <- c(4, 1, 2, 3)
+
 plot_data <- data.frame()
 
-# Loop through scenarios and simulations to compute pairwise distances
-par(mfrow = c(2, 2))  # Arrange plots in a 2x2 grid
-for (i in seq_along(scenarios)) {
-  scenario_number <- as.character(i)
+for (i in plot_order) {
   scenario_data <- scenarios[[i]][1:50]
+  coef_label <- select_coef[i]  # This correctly maps i to its coefficient
+  cat("Processing Scenario", i, " (Selection Coefficient", coef_label, ")\n")
   
-  for (tree_type in 1:4) {  # Loop over tree types
+  for (tree_type in 1:4) {
     tree_distances <- lapply(scenario_data, function(sim) sim[[tree_type]])
-    # dmat_list <- lapply(tree_distances, dist_matrix)
     dmat_list <- dist_matrix(tree_distances, "l2", FALSE)
-    
-    # Extract upper triangular part of distance matrices
     list_d <- dmat_list[upper.tri(dmat_list)]
     
-    # Store data for ggplot
-    plot_data <- rbind(plot_data, data.frame(Scenario = paste("Scenario ", scenario_number), TreeType = as.factor(tree_type), Distance = list_d))
+    plot_data <- rbind(
+      plot_data,
+      data.frame(
+        Scenario = paste("Selection Coefficient", coef_label),
+        TreeType = as.factor(tree_type),
+        Distance = list_d
+      )
+    )
   }
 }
 
-# Plot using ggplot
+# Explicitly set the factor level order for correct facet display
+plot_data$Scenario <- factor(
+  plot_data$Scenario,
+  levels = paste("Selection Coefficient", select_coef[plot_order])
+)
+
+# Final plot
 ggplot(plot_data, aes(x = Distance, fill = TreeType)) +
   geom_histogram(alpha = 0.6, position = "identity", bins = 50) +
-  facet_wrap(~Scenario) +
+  facet_wrap(~Scenario, ncol = 2) +
   theme_minimal() +
-  labs(title = "Pairwise Tree Distance Distributions (l2, unweighted)", x = "Pairwise Distance", y = "Density", fill = "Tree Type")
+  labs(
+    title = "Pairwise Tree Distance Distributions (l2, unweighted)",
+    x = "Pairwise Distance", y = "Density", fill = "Tree Type"
+  )
 ```
 
 Plot distribution of pairwise distances (l2w)
 ```{r}
-# Loop through scenarios and simulations to compute pairwise distances
+# Coefficient values for scenarios 1–4
+select_coef <- c("0.001", "0.01", "0.1", "0")
+
+# Define the plotting order: 4 → 1 → 2 → 3
+plot_order <- c(4, 1, 2, 3)
+
 plot_data <- data.frame()
 
-# Loop through scenarios and simulations to compute pairwise distances
-par(mfrow = c(2, 2))  # Arrange plots in a 2x2 grid
-for (i in seq_along(scenarios)) {
-  scenario_number <- as.character(i)
+for (i in plot_order) {
   scenario_data <- scenarios[[i]][1:50]
+  coef_label <- select_coef[i]  # This correctly maps i to its coefficient
+  cat("Processing Scenario", i, " (Selection Coefficient", coef_label, ")\n")
   
-  for (tree_type in 1:4) {  # Loop over tree types
+  for (tree_type in 1:4) {
     tree_distances <- lapply(scenario_data, function(sim) sim[[tree_type]])
-    # dmat_list <- lapply(tree_distances, dist_matrix)
     dmat_list <- dist_matrix(tree_distances, "l2", TRUE)
-    
-    # Extract upper triangular part of distance matrices
     list_d <- dmat_list[upper.tri(dmat_list)]
     
-    # Store data for ggplot
-    plot_data <- rbind(plot_data, data.frame(Scenario = paste("Scenario ", scenario_number), TreeType = as.factor(tree_type), Distance = list_d))
+    plot_data <- rbind(
+      plot_data,
+      data.frame(
+        Scenario = paste("Selection Coefficient", coef_label),
+        TreeType = as.factor(tree_type),
+        Distance = list_d
+      )
+    )
   }
 }
 
-# Plot using ggplot
+# Explicitly set the factor level order for correct facet display
+plot_data$Scenario <- factor(
+  plot_data$Scenario,
+  levels = paste("Selection Coefficient", select_coef[plot_order])
+)
+
+# Final plot
 ggplot(plot_data, aes(x = Distance, fill = TreeType)) +
   geom_histogram(alpha = 0.6, position = "identity", bins = 50) +
-  facet_wrap(~Scenario) +
+  facet_wrap(~Scenario, ncol = 2) +
   theme_minimal() +
-  labs(title = "Pairwise Tree Distance Distributions (l2, weighted)", x = "Pairwise Distance", y = "Density", fill = "Tree Type")
+  labs(
+    title = "Pairwise Tree Distance Distributions (l2, weighted)",
+    x = "Pairwise Distance", y = "Density", fill = "Tree Type"
+  )
 ```
 
 Compute F matrices for each simulated Trees.

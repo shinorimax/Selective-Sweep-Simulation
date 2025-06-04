@@ -33,7 +33,7 @@ library(tidyr)
 ## Add "state" column to the dataframe, indicating whether the tree position is under selection (1) or neutral (0)
 
 ```{r}
-all_files <- list.files("/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_ARG", pattern = "\\.csv$", full.names = TRUE)
+all_files <- list.files("/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_ARG_0.1/CSVs_run2", pattern = "\\.csv$", full.names = TRUE)
 
 # Parameters
 selected_site <- 25000  # Location of selection in bp
@@ -96,7 +96,7 @@ for (file_index in seq_along(all_files)) {
 ```
 
 ```{r}
-saveRDS(all_chromosomes, "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_ARG/all_chromosomes_grouped.rds")
+saveRDS(all_chromosomes, "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_ARG_0.1/all_chromosomes_grouped.rds")
 ```
 
 ```{r}
@@ -141,7 +141,7 @@ for (file_index in seq_along(all_files)) {
 # Save with genomic positions now included
 saveRDS(
   all_trees,
-  file = "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_ARG/all_trees_with_Fmat.rds"
+  file = "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/Results/Two_Sample_Test_ARG_0.1/all_trees_with_Fmat.rds"
 )
 
 message(sprintf("✅ Done! Total trees processed: %d", counter))
@@ -318,7 +318,7 @@ pad_Fmat <- function(Fmat, target_dim) {
 F_val_list <- lapply(unlist(val_set, recursive = FALSE), function(x) pad_Fmat(x$Fmat, max_dim))
 
 # Example: compute emission matrix with current beta values
-E_val <- compute_emission_matrix(F_val_list, F_0, F_1, beta_0 = 0.001, beta_1 = 0.0005)
+E_val <- compute_emission_matrix(F_val_list, F_0, F_1, beta_0 = 0.001, beta_1 = 0.001)
 ```
 
 ## Visualize E_val statistics
@@ -515,8 +515,8 @@ hist(log_ratio, breaks = 50, main = "Log-likelihood ratio: log(P(F|1)/P(F|0))")
 ## Test on Test set
 
 ```{r}
-beta_0 <- 0.002
-beta_1 <- 0.001
+# beta_0 <- 0.002
+# beta_1 <- 0.001
 
 max_dim <- max(nrow(F_0), nrow(F_1))
 

@@ -1,16 +1,16 @@
 import msprime
 import os
 
-# Parameters
+# === Parameters ===
 Ne = 10_000
 L = int(1e5)
-num_samples = 25
+num_individuals = 25            # 25 diploid individuals = 50 haploid genomes
 selection_s = 0.1
 recomb_rate = 1.25e-8
 mut_rate = 1e-8
-mut_loc = int(L / 4)  # 25_000
+mut_loc = int(L / 4)            # Selected site at 25,000
 
-# Setup selection at one site
+# === Define selective sweep model ===
 sweep = msprime.SweepGenicSelection(
     position=mut_loc,
     start_frequency=1 / (2 * Ne),
@@ -19,9 +19,9 @@ sweep = msprime.SweepGenicSelection(
     dt=1e-6,
 )
 
-# Step 1: Simulate ancestry with selection
+# === Step 1: Simulate ancestry with diploid individuals ===
 ts = msprime.sim_ancestry(
-    samples=num_samples,
+    samples=num_individuals,
     sequence_length=L,
     recombination_rate=recomb_rate,
     population_size=Ne,
@@ -29,21 +29,12 @@ ts = msprime.sim_ancestry(
     random_seed=42,
 )
 
-# Step 2: Simulate mutations with explicit mutation rate
+# === Step 2: Simulate mutations ===
 mutated_ts = msprime.sim_mutations(ts, rate=mut_rate, random_seed=43)
 
-# Export to VCF format for ARGweaver
-os.makedirs("Results/Two_Sample_Test_ARG_0.1", exist_ok=True)
-with open("Results/Two_Sample_Test_ARG_0.1/simulated_data.vcf", "w") as vcf_file:
-    mutated_ts.write_vcf(vcf_file)
-    # Export to .sites format for ARGweaver
-# with open("Results/Two_Sample_Test_ARG_0.1/simulated_data.sites", "w") as f:
-#     print("NAMES", " ".join(mutated_ts.individual(i).metadata.get("name", f"tsk_{i}")
-#                            for i in range(mutated_ts.num_samples)), file=f)
-#     print("REGION 0", int(mutated_ts.sequence_length), file=f)
-#     print("SITES", file=f)
+# === Step 3: Write VCF ===
+output_dir = "Results/Two_Sample_Test_ARG_0.1"
+os.makedirs(output_dir, exist_ok=True)
 
-#     for var in mutated_ts.variants():
-#         alleles = var.alleles
-#         assert len(alleles) == 2  # Ensure biallelic
-#         print(var.site.position, *var.genotypes, sep="\t", file=f)
+with open(os.path.join(output_dir, "simulated_data.vcf"), "w") as vcf_file:
+    mutated_ts.write_vcf(vcf_file)
