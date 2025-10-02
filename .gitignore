@@ -21,4 +21,14 @@ venv-lct/
 __pycache__/
 .ipynb_checkpoints/
 
+## Exclude Conda Environment
+sweep312/
+
+## Exclude Slim Result Files
+SliM/trees/
+SliM/outs/
+SliM/checkpoints/
+SliM/slimfiles/
+SliM/etas/
+
 README.md

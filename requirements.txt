@@ -11,4 +11,5 @@ numpy
 
 # data visualization
 matplotlib
+seaborn
 IPython

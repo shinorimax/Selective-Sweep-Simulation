@@ -1,5 +1,5 @@
 #!/bin/sh
-'''exec' "/Users/yagishinnosuke/Documents/2024-2025 Stanford/Research/Selective-Sweep-Simulation/venv/bin/python3.11" "$0" "$@"
+'''exec' "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/Selective-Sweep-Simulation/venv/bin/python" "$0" "$@"
 ' '''
 # -*- coding: utf-8 -*-
 import re
