@@ -216,9 +216,7 @@ class PSlim:
         #         simID_str, str(Args['N']), str(Args['Ne']),
         #         str(Args['r']), str(Args['mu'])]
 
-        cmd2 = ["python", "recap.py",
-        simID_str, str(self.Args['N']), str(self.Args['Ne']),
-        str(self.Args['r']), str(self.Args['mu'])]
+        cmd2 = ["python", "recap.py", simID_str, str(self.Args['N']), str(self.Args['Ne']), str(self.Args['r']), str(self.Args['mu'])]
 
         print("commands set up")
 

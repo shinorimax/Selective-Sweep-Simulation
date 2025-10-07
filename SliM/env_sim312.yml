@@ -1,0 +1,13 @@
+name: sim312
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - tskit>=0.6.2,<0.7
+  - pyslim>=1.0.6
+  - msprime>=1.5
+  - pandas
+  - numpy
+  - matplotlib
+  - ruptures
+  - scipy
