@@ -26,6 +26,7 @@ sweep312/
 
 ## Exclude Slim Result Files
 SliM/trees/
+SliM/trees_newick/
 SliM/outs/
 SliM/checkpoints/
 SliM/slimfiles/

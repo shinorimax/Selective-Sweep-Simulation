@@ -1,0 +1,278 @@
+---
+title: "ROC_AUC"
+author: "Shinnosuke Yagi"
+date: "2025-10-11"
+output: html_document
+---
+## Import Libraries
+```{r, message=FALSE}
+library(ape)
+library(spam)
+library(devtools)
+library(INLA)
+library(pROC)
+library(ggplot2)
+library(dplyr)
+library(purrr)
+library(readr)
+library(stringr)
+```
+
+```{r}
+install_github("JuliaPalacios/phylodyn")
+library(phylodyn)
+```
+
+## Distance Calculation Example
+
+```{r}
+# Read a .tree file (Newick format)
+tree1 <- read.tree("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/Selective-Sweep-Simulation/SliM/trees_newick/r3000000.tree")
+
+tree2 <- read.tree("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/Selective-Sweep-Simulation/SliM/trees_newick/r3060000.tree")
+
+# Check one tree
+plot(tree1[[2]], type = "phylogram")
+plot(tree2[[2]], type = "phylogram")
+
+dist <- dist_pairwise(tree1[[1]], tree2[[1]], dist.method='l1', weighted=FALSE)
+```
+
+## Load all trees from s=0 (set id 0) and s=0.01, freq=0.75 (set id 6)
+
+```{r}
+data_dir <- "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/Selective-Sweep-Simulation/SliM/trees_newick"
+
+# Read .tree FILES by prefix; one list element per file
+read_files_by_prefix <- function(dir, prefix) {
+  files <- list.files(dir, pattern = paste0("^", prefix, ".*\\.tree$"),
+                      full.names = TRUE)
+  files <- sort(files)
+  out <- lapply(files, function(f) {
+    tr <- read.tree(f)                     # phylo or multiPhylo
+    if (inherits(tr, "phylo")) {
+      # wrap single tree so each element is consistently multiPhylo
+      tr <- structure(list(tr), class = "multiPhylo")
+    }
+    tr
+  })
+  names(out) <- basename(files)
+  out
+}
+
+neutrals   <- read_files_by_prefix(data_dir, "r300")
+selectives <- read_files_by_prefix(data_dir, "r306")
+
+# Sanity checks
+cat("neutrals files:", length(neutrals), "\n")
+cat("selectives files:", length(selectives), "\n")
+
+# Example access:
+#   first file’s 3rd tree:
+#   neutrals[[1]][[3]]
+```
+
+## ROC Curves
+We calculate the distance between two neighboring trees for each .tree files. so If there are 100 .tree files for neutral and selective scenario each, and each .tree files contains 100 trees, there will be 9900 (100 tree files x 99 neighboring comparisons for 100 trees in each file) values of distance stats for each scenario. We then simply move the threshold, classify everything above it as selective and below as neutral. Plotting this is the ROC curve in R
+
+```{r}
+# --- Config ----------------------------------------------------------------
+# Directory containing your exported Newick files (one or many trees per file)
+data_dir <- "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/Selective-Sweep-Simulation/SliM/trees_newick"
+
+# Distance settings (pass through to your dist_pairwise)
+dist.method <- "l1"
+weighted    <- FALSE
+
+# --- Helpers ---------------------------------------------------------------
+
+# Read all files matching a regex pattern; return a named list of 'multiPhylo'
+# (If a file has a single tree, we wrap it into a multiPhylo of length 1)
+read_files_by_pattern <- function(dir, pattern) {
+  files <- list.files(dir, pattern = pattern, full.names = TRUE)
+  files <- sort(files)
+  out <- lapply(files, function(f) {
+    tr <- read.tree(f)                         # phylo or multiPhylo
+    if (inherits(tr, "phylo")) {
+      tr <- structure(list(tr), class = "multiPhylo")
+    }
+    tr
+  })
+  names(out) <- basename(files)
+  out
+}
+
+# --- Updated version with progress printing every 1% -----------------------
+
+# Compute distances between consecutive trees in one file,
+# printing progress every 1% of the pairs processed.
+adjacent_distances_one_file <- function(multi, dist.method = "l1", weighted = FALSE) {
+  n <- length(multi)
+  if (n < 2) return(numeric(0))
+
+  d <- numeric(n - 1)
+  total <- n - 1
+  step <- max(1, floor(total / 100))  # every 1%
+
+  cat(sprintf("  %d adjacent pairs to process ...\n", total))
+  last_print <- 0
+
+  for (i in seq_len(total)) {
+    d[i] <- tryCatch(
+      dist_pairwise(multi[[i]], multi[[i + 1]],
+                    dist.method = dist.method, weighted = weighted),
+      error = function(e) NA_real_
+    )
+
+    # progress: print every 1%
+    if (i %% step == 0 || i == total) {
+      pct <- round(100 * i / total)
+      if (pct > last_print) {
+        cat(sprintf("\r    progress: %3d%%", pct))
+        flush.console()
+        last_print <- pct
+      }
+    }
+  }
+  cat("\n  done.\n")
+  d[is.finite(d)]
+}
+
+# Apply the above to every file in the list, also printing file-level progress.
+adjacent_distances_many <- function(files_list, dist.method = "l1", weighted = FALSE) {
+  total_files <- length(files_list)
+  cat(sprintf("Computing adjacent-tree distances for %d files ...\n", total_files))
+  res <- list()
+
+  for (idx in seq_along(files_list)) {
+    fname <- names(files_list)[idx]
+    cat(sprintf("[%d/%d] %s\n", idx, total_files, fname))
+    res[[fname]] <- adjacent_distances_one_file(
+      files_list[[idx]],
+      dist.method = dist.method,
+      weighted = weighted
+    )
+  }
+
+  cat("All files processed.\n")
+  unlist(res, use.names = FALSE)
+}
+```
+
+```{r}
+# File-name prefixes that identify the neutral vs selective sets
+# (adjust to match how you exported them; these match your earlier example)
+neutral_prefix   <- "^r300.*\\.tree$"
+selective_prefix <- "^r306.*\\.tree$"
+
+# --- Load data -------------------------------------------------------------
+neutrals   <- read_files_by_pattern(data_dir, neutral_prefix)
+selectives <- read_files_by_pattern(data_dir, selective_prefix)
+
+cat("Neutral files   :", length(neutrals),   "\n")
+cat("Selective files :", length(selectives), "\n")
+```
+
+```{r}
+# --- Compute adjacent-tree distances ---------------------------------------
+dist_neu <- adjacent_distances_many(neutrals,   dist.method = dist.method, weighted = weighted)
+dist_sel <- adjacent_distances_many(selectives, dist.method = dist.method, weighted = weighted)
+
+cat("Neutral distances   :", length(dist_neu), "\n")
+cat("Selective distances :", length(dist_sel), "\n")
+```
+
+```{r}
+# y = labels (0 neutral, 1 selective), s = scores (distances)
+# Make sure these are already built as in your code:
+# y <- c(rep(0, length(dist_neu)), rep(1, length(dist_sel)))
+# s <- c(dist_neu, dist_sel)
+keep <- is.finite(s)
+y <- y[keep]; s <- s[keep]
+
+# ROC (use ">" if larger scores => selective)
+roc_obj <- roc(response = y, predictor = s, direction = "<")
+
+# AUC
+auc_val <- as.numeric(auc(roc_obj))
+
+# Build a data frame for ggplot
+df_roc <- data.frame(
+  fpr = 1 - roc_obj$specificities,   # False Positive Rate
+  tpr = roc_obj$sensitivities        # True Positive Rate
+)
+
+# Plot (styled like the Python one)
+ggplot(df_roc, aes(x = fpr, y = tpr)) +
+  geom_abline(slope = 1, intercept = 0, linetype = 2, color = "grey60") +
+  geom_path(linewidth = 1.4, color = "#1f77b4") +
+  coord_equal(xlim = c(0, 1), ylim = c(0, 1), expand = FALSE) +
+  labs(
+    title = "ROC: Adjacent-tree distance (Neutral vs Selective)",
+    subtitle = sprintf("AUC = %.3f", auc_val),
+    x = "False Positive Rate",
+    y = "True Positive Rate"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    panel.grid.minor = element_blank(),
+    plot.title = element_text(face = "bold")
+  )
+```
+
+```{r}
+# --- (Optional) Quick distribution check -----------------------------------
+# Uncomment if you want to visualize the raw score separation.
+hist(dist_neu, breaks = 50, main = "Adjacent-tree distance distributions",
+     xlab = "distance", col = rgb(0.2,0.4,0.8,0.4), freq = FALSE, border = NA)
+hist(dist_sel, breaks = 50, col = rgb(0.8,0.2,0.2,0.4), add = TRUE, freq = FALSE, border = NA)
+legend("topright", c("neutral","selective"),
+       fill = c(rgb(0.2,0.4,0.8,0.4), rgb(0.8,0.2,0.2,0.4)), bty = "n")
+```
+
+## Position vs Adjacent-Tree Distance
+
+```{r}
+# Read breakpoints sidecar
+read_breaks <- function(dir, stem) {
+  read_csv(file.path(dir, paste0(stem, "_breaks.csv")), show_col_types = FALSE)
+}
+
+# Adjacent distances for one file, placed at boundary = previous right (= current left)
+adjacent_distances_one_file <- function(trees, breaks_df, file_id, method="l1", weighted=FALSE) {
+  n <- length(trees); if (n < 2) return(tibble(file=file_id, x=numeric(0), dist=numeric(0)))
+  # your distance function
+  tree_distance <- function(a,b) dist_pairwise(a,b, dist.method=method, weighted=weighted)
+  d <- map_dbl(1:(n-1), ~ tree_distance(trees[[.x]], trees[[.x+1]]))
+  # boundary positions where tree i and i+1 meet is breaks_df$right[i]
+  tibble(file=file_id, x=breaks_df$right[1:(n-1)], dist=d)
+}
+
+# Batch over a scenario
+adjacent_distances_scenario <- function(dir, file_list, label) {
+  map_dfr(names(file_list), function(bn) {
+    stem <- str_remove(bn, "\\.tree$")
+    brk  <- read_breaks(dir, stem)
+    adjacent_distances_one_file(file_list[[bn]], brk, bn)
+  }) |> mutate(scenario = label, .before = 1)
+}
+
+# Load trees
+# neutrals   <- read_files_by_pattern(data_dir, neutral_prefix)
+# selectives <- read_files_by_pattern(data_dir, selective_prefix)
+
+df_neu <- adjacent_distances_scenario(data_dir, neutrals, "neutral")
+df_sel <- adjacent_distances_scenario(data_dir, selectives, "selective")
+df_all <- bind_rows(df_neu, df_sel)
+
+ggplot(df_all, aes(x=x, y=dist, group=file)) +
+  geom_line(alpha=0.25, linewidth=0.6) +
+  facet_wrap(~scenario, ncol=1, scales="free_y") +
+  labs(x="Genomic position (boundary between adjacent trees)",
+       y="Adjacent-tree distance") +
+  theme_minimal(base_size=13)
+```
+
+
+
+
