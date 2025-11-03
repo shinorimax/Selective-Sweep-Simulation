@@ -1,0 +1,398 @@
+---
+title: "chromosome_wide_Fmat_analysis"
+author: "Shinnosuke Yagi"
+date: "2025-11-02"
+output: html_document
+---
+
+## Method
+
+1. Take weighted average of all F-matrices on a chromosome
+2. Take distance to empirically estimated Kingman
+
+## Import Libraries
+
+```{r, message=FALSE}
+library(ape)
+library(spam)
+library(devtools)
+library(INLA)
+library(pROC)
+library(ggplot2)
+library(dplyr)
+library(purrr)
+library(readr)
+library(stringr)
+library(fmatrix)
+```
+
+```{r}
+# install_github("JuliaPalacios/phylodyn")
+library(phylodyn)
+```
+
+## Load Trees from s=0 (set id 0) and s=0.01, freq=0.75 (set id 6)
+
+```{r}
+# --- Config ----------------------------------------------------------------
+# Directory containing your exported Newick files (one or many trees per file)
+data_dir <- "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/Selective-Sweep-Simulation/SliM/trees_newick"
+
+# Distance settings (pass through to your dist_pairwise)
+dist.method <- "l1"
+weighted    <- FALSE
+
+# --- Helpers ---------------------------------------------------------------
+
+# Read all files matching a regex pattern; return a named list of 'multiPhylo'
+# (If a file has a single tree, we wrap it into a multiPhylo of length 1)
+read_files_by_pattern <- function(dir, pattern) {
+  files <- list.files(dir, pattern = pattern, full.names = TRUE)
+  files <- sort(files)
+  out <- lapply(files, function(f) {
+    tr <- read.tree(f)                         # phylo or multiPhylo
+    if (inherits(tr, "phylo")) {
+      tr <- structure(list(tr), class = "multiPhylo")
+    }
+    tr
+  })
+  names(out) <- basename(files)
+  out
+}
+```
+
+```{r}
+# File-name prefixes that identify the neutral vs selective sets
+# (adjust to match how you exported them; these match your earlier example)
+neutral_prefix   <- "^r300.*\\.tree$"
+selective_prefix <- "^r306.*\\.tree$"
+
+# --- Load data -------------------------------------------------------------
+neutrals   <- read_files_by_pattern(data_dir, neutral_prefix)
+selectives <- read_files_by_pattern(data_dir, selective_prefix)
+
+cat("Neutral files   :", length(neutrals),   "\n")
+cat("Selective files :", length(selectives), "\n")
+```
+
+```{r}
+neutrals_train <- neutrals[1:90] # For Kingman Estimation
+neutrals_test <- neutrals[91:180] # For distribution analysis
+
+selectives <- selectives[1:90]
+```
+
+## Calculate the Weighted-average F-matrix for each scenario
+
+### Neutral-train
+
+```{r}
+# neutrals is a list of length = # tree files; each entry is a list/multiPhylo of trees
+# (as you noted: access via neutrals[[i]][[j]])
+flatten_neutral_trees <- function(neutral_lists) {
+  # robustly flatten into a simple list of phylo objects
+  out <- list()
+  idx <- 1L
+  for (i in seq_along(neutral_lists)) {
+    trees_i <- neutral_lists[[i]]
+    for (j in seq_along(trees_i)) {
+      out[[idx]] <- trees_i[[j]]
+      attr(out[[idx]], "src_idx") <- c(i = i, j = j)  # keep (i,j) for traceability
+      idx <- idx + 1L
+    }
+  }
+  out
+}
+
+all_neutral_trees <- flatten_neutral_trees(neutrals_train)
+n_trees <- length(all_neutral_trees)
+
+Fs <- vector("list", n_trees)
+pb <- txtProgressBar(min = 0, max = n_trees, style = 3)
+for (k in seq_len(n_trees)) {
+  tree_k <- all_neutral_trees[[k]]
+  F_k <- gen_Fmat(tree_k, tol = 8)
+  attr(F_k, "src_idx") <- attr(tree_k, "src_idx")  # <-- copy attribute
+  Fs[[k]] <- F_k
+  setTxtProgressBar(pb, k)
+}
+close(pb)
+```
+
+```{r}
+# assume each element in neutrals_train corresponds to a tree stem, in order
+chrom_stems <- names(neutrals_train)
+if (is.null(chrom_stems)) {
+  # fallback: infer from CSV filenames if neutrals_train has no names
+  chrom_stems <- unique(sub("_breaks\\.csv$", "", list.files(data_dir, pattern = "_breaks\\.csv$")))
+}
+
+# helper to compute weighted mean of F-matrices
+weighted_average_F <- function(F_list, weights) {
+  stopifnot(length(F_list) == length(weights))
+  dimF <- dim(F_list[[1]])
+  F_sum <- matrix(0, nrow = dimF[1], ncol = dimF[2])
+  w_total <- sum(weights)
+  for (i in seq_along(F_list)) {
+    F_sum <- F_sum + weights[i] * F_list[[i]]
+  }
+  F_sum / w_total
+}
+
+# container for weighted-average F per chromosome/scenario
+F_weighted_list_neutral_train <- vector("list", length(neutrals_train))
+names(F_weighted_list_neutral_train) <- chrom_stems
+
+for (i in seq_along(neutrals_train)) {
+  stem <- chrom_stems[i]
+  csv_path <- file.path(data_dir, paste0(sub("\\.tree$", "", stem), "_breaks.csv"))
+  if (!file.exists(csv_path)) {
+    warning("Missing break file: ", csv_path)
+    next
+  }
+
+  df_breaks <- read_csv(csv_path, show_col_types = FALSE)
+  df_breaks$width <- df_breaks$right - df_breaks$left
+
+  # pull out the subset of F-matrices that came from this chromosome
+  F_indices <- which(vapply(Fs, function(f) attr(f, "src_idx")[["i"]] == i, logical(1)))
+  F_chr <- Fs[F_indices]
+
+  # sort to align with tree_index order in CSV
+  F_chr <- F_chr[order(df_breaks$tree_index)]
+  weights <- df_breaks$width
+
+  # compute weighted average
+  F_weighted_list_neutral_train[[i]] <- weighted_average_F(F_chr, weights)
+
+  cat(sprintf("✅ %s: weighted average of %d trees computed.\n", stem, length(F_chr)))
+}
+
+# Now F_weighted_list has one weighted-average F-matrix per chromosome/scenario
+str(F_weighted_list_neutral_train)
+```
+
+### Neutral-test
+
+```{r}
+all_neutral_trees <- flatten_neutral_trees(neutrals_test)
+n_trees <- length(all_neutral_trees)
+
+Fs <- vector("list", n_trees)
+pb <- txtProgressBar(min = 0, max = n_trees, style = 3)
+for (k in seq_len(n_trees)) {
+  tree_k <- all_neutral_trees[[k]]
+  F_k <- gen_Fmat(tree_k, tol = 8)
+  attr(F_k, "src_idx") <- attr(tree_k, "src_idx")  # <-- copy attribute
+  Fs[[k]] <- F_k
+  setTxtProgressBar(pb, k)
+}
+close(pb)
+```
+
+```{r}
+# assume each element in neutrals_train corresponds to a tree stem, in order
+chrom_stems <- names(neutrals_test)
+if (is.null(chrom_stems)) {
+  # fallback: infer from CSV filenames if neutrals_train has no names
+  chrom_stems <- unique(sub("_breaks\\.csv$", "", list.files(data_dir, pattern = "_breaks\\.csv$")))
+}
+
+# container for weighted-average F per chromosome/scenario
+F_weighted_list_neutral_test <- vector("list", length(neutrals_test))
+names(F_weighted_list_neutral_test) <- chrom_stems
+
+for (i in seq_along(neutrals_test)) {
+  stem <- chrom_stems[i]
+  csv_path <- file.path(data_dir, paste0(sub("\\.tree$", "", stem), "_breaks.csv"))
+  if (!file.exists(csv_path)) {
+    warning("Missing break file: ", csv_path)
+    next
+  }
+
+  df_breaks <- read_csv(csv_path, show_col_types = FALSE)
+  df_breaks$width <- df_breaks$right - df_breaks$left
+
+  # pull out the subset of F-matrices that came from this chromosome
+  F_indices <- which(vapply(Fs, function(f) attr(f, "src_idx")[["i"]] == i, logical(1)))
+  F_chr <- Fs[F_indices]
+
+  # sort to align with tree_index order in CSV
+  F_chr <- F_chr[order(df_breaks$tree_index)]
+  weights <- df_breaks$width
+
+  # compute weighted average
+  F_weighted_list_neutral_test[[i]] <- weighted_average_F(F_chr, weights)
+
+  cat(sprintf("✅ %s: weighted average of %d trees computed.\n", stem, length(F_chr)))
+}
+
+# Now F_weighted_list has one weighted-average F-matrix per chromosome/scenario
+```
+
+### Selective Trees
+
+```{r}
+all_selective_trees <- flatten_neutral_trees(selectives)
+n_trees <- length(all_selective_trees)
+
+Fs <- vector("list", n_trees)
+pb <- txtProgressBar(min = 0, max = n_trees, style = 3)
+for (k in seq_len(n_trees)) {
+  tree_k <- all_selective_trees[[k]]
+  F_k <- gen_Fmat(tree_k, tol = 8)
+  attr(F_k, "src_idx") <- attr(tree_k, "src_idx")  # <-- copy attribute
+  Fs[[k]] <- F_k
+  setTxtProgressBar(pb, k)
+}
+close(pb)
+```
+
+```{r}
+# assume each element in neutrals_train corresponds to a tree stem, in order
+chrom_stems <- names(selectives)
+if (is.null(chrom_stems)) {
+  # fallback: infer from CSV filenames if neutrals_train has no names
+  chrom_stems <- unique(sub("_breaks\\.csv$", "", list.files(data_dir, pattern = "_breaks\\.csv$")))
+}
+
+# helper to compute weighted mean of F-matrices
+weighted_average_F <- function(F_list, weights) {
+  stopifnot(length(F_list) == length(weights))
+  dimF <- dim(F_list[[1]])
+  F_sum <- matrix(0, nrow = dimF[1], ncol = dimF[2])
+  w_total <- sum(weights)
+  for (i in seq_along(F_list)) {
+    F_sum <- F_sum + weights[i] * F_list[[i]]
+  }
+  F_sum / w_total
+}
+
+# container for weighted-average F per chromosome/scenario
+F_weighted_list_selective <- vector("list", length(selectives))
+names(F_weighted_list_selective) <- chrom_stems
+
+for (i in seq_along(neutrals_test)) {
+  stem <- chrom_stems[i]
+  csv_path <- file.path(data_dir, paste0(sub("\\.tree$", "", stem), "_breaks.csv"))
+  if (!file.exists(csv_path)) {
+    warning("Missing break file: ", csv_path)
+    next
+  }
+
+  df_breaks <- read_csv(csv_path, show_col_types = FALSE)
+  df_breaks$width <- df_breaks$right - df_breaks$left
+
+  # pull out the subset of F-matrices that came from this chromosome
+  F_indices <- which(vapply(Fs, function(f) attr(f, "src_idx")[["i"]] == i, logical(1)))
+  F_chr <- Fs[F_indices]
+
+  # sort to align with tree_index order in CSV
+  F_chr <- F_chr[order(df_breaks$tree_index)]
+  weights <- df_breaks$width
+
+  # compute weighted average
+  F_weighted_list_selective[[i]] <- weighted_average_F(F_chr, weights)
+
+  cat(sprintf("✅ %s: weighted average of %d trees computed.\n", stem, length(F_chr)))
+}
+
+# Now F_weighted_list has one weighted-average F-matrix per chromosome/scenario
+```
+
+## Estimate Kingman
+
+```{r}
+# --- 1. Compute empirical mean F-matrix under neutrality ----
+F_mean_neutral <- Reduce("+", F_weighted_list_neutral_train) / length(F_weighted_list_neutral_train)
+```
+
+## Calculate and store distance to Kingman
+
+```{r}
+# --- Helper function for L1 distance (unweighted) ----
+dist_d1 <- function(F1, F2) {
+  sum(abs(F1 - F2))
+}
+
+# --- 2. Distances to empirical mean ----
+d_neutral_test <- vapply(F_weighted_list_neutral_test,
+                         function(F) dist_d1(F, F_mean_neutral),
+                         numeric(1))
+
+d_selective <- vapply(F_weighted_list_selective,
+                      function(F) dist_d1(F, F_mean_neutral),
+                      numeric(1))
+```
+
+## Plot distribution
+
+```{r}
+# Combine into one data frame
+df_dist <- data.frame(
+  distance = c(d_neutral_test, d_selective),
+  scenario = rep(c("Neutral", "Selective"),
+                 c(length(d_neutral_test), length(d_selective)))
+)
+
+# Plot densities
+ggplot(df_dist, aes(x = distance, fill = scenario)) +
+  geom_density(alpha = 0.4, adjust = 1.2) +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "Distribution of d1 Distances to Neutral Mean F-matrix",
+    x = expression(paste("Distance (", d[1], ")")),
+    y = "Density"
+  ) +
+  scale_fill_manual(values = c("#1b9e77", "#d95f02"))
+```
+
+```{r}
+# --- 1. Prepare labels and scores --------------------------------------------
+# "Neutral" = 0 class, "Selective" = 1 class
+labels <- c(rep("Neutral",   length(d_neutral_test)),
+            rep("Selective", length(d_selective)))
+scores <- c(d_neutral_test, d_selective)   # larger distance => more likely Selective
+
+# --- 2. Compute ROC curve and AUC -------------------------------------------
+if (!requireNamespace("pROC", quietly = TRUE)) install.packages("pROC")
+library(pROC)
+
+# direction = "<" means: smaller scores → Neutral, larger → Selective
+roc_obj <- roc(response = labels,
+               predictor = scores,
+               levels = c("Neutral", "Selective"),
+               direction = "<")
+
+auc_val <- as.numeric(auc(roc_obj))
+cat(sprintf("AUC = %.3f\n", auc_val))
+
+# --- 3. Build a tidy ROC data frame ------------------------------------------
+roc_df <- data.frame(
+  fpr = 1 - roc_obj$specificities,
+  tpr = roc_obj$sensitivities
+)
+
+# --- 4. Plot with ggplot2 ----------------------------------------------------
+library(ggplot2)
+
+ggplot(roc_df, aes(x = fpr, y = tpr)) +
+  geom_path(linewidth = 1.2, color = "#d95f02") +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "gray50") +
+  coord_equal() +
+  labs(
+    title = sprintf("ROC Curve (AUC = %.3f)", auc_val),
+    x = "False Positive Rate (1 - specificity)",
+    y = "True Positive Rate (sensitivity)"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+```
+
+```{r}
+selectives[[1]]
+```
+

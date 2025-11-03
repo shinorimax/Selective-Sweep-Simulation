@@ -5,9 +5,14 @@ date: "2025-10-27"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
+## Method
+
+1. Convert all simulated trees to F-matrix
+2. Split the neutral trees into train and test
+3. Use train trees to empirically estimate the "Kingman" under neutrality
+4. Take distance from the selectice trees and neutral_test trees to the "Kingman"
+5. Compare distribution
+
 
 ## Import Libraries
 
@@ -27,6 +32,11 @@ library(stringr)
 ```{r}
 install_github("JuliaPalacios/phylodyn")
 library(phylodyn)
+```
+
+```{r}
+#install_github("RSamyak/fmatrix")
+library(fmatrix)
 ```
 
 ## Distance Calculation Example
@@ -130,6 +140,7 @@ neutrals_test <- neutrals[51:100]
 ```
 
 ## Calculate the "empirical Kingman" by taking the mean F-mat of all neutral trees with 49 by 49 dimension
+> Use tol=8 to avoid the function treating the tree to have multiple sampling events
 
 ```{r}
 # neutrals is a list of length = # tree files; each entry is a list/multiPhylo of trees
@@ -157,7 +168,7 @@ cat(sprintf("Found %d neutral trees.\n", n_trees))
 Fs <- vector("list", n_trees)
 pb <- txtProgressBar(min = 0, max = n_trees, style = 3)
 for (k in seq_len(n_trees)) {
-  Fs[[k]] <- gen_Fmat(all_neutral_trees[[k]])  # from tree_distance.R
+  Fs[[k]] <- gen_Fmat(all_neutral_trees[[k]], tol=8)  # from tree_distance.R
   setTxtProgressBar(pb, k)
 }
 close(pb)
@@ -218,7 +229,7 @@ build_Fmats_49 <- function(trees) {
   pb <- txtProgressBar(min = 0, max = length(trees), style = 3)
   kept <- logical(length(trees))
   for (k in seq_along(trees)) {
-    Fk <- gen_Fmat(trees[[k]])
+    Fk <- gen_Fmat(trees[[k]], tol=8)
     if (!is.null(Fk) && all(dim(Fk) == c(49, 49))) {
       Fs[[k]] <- Fk
       kept[k] <- TRUE
@@ -289,7 +300,7 @@ ggplot(df, aes(x = distance, fill = scenario)) +
 
 labels <- c(rep("Neutral",   length(d_neutral_l1)),
             rep("Selective", length(d_selective_l1)))
-scores <- c(d_neutral, d_selective)   # higher => more likely Selective
+scores <- c(d_neutral_l1, d_selective_l1)   # higher => more likely Selective
 
 # --- Option A: pROC (simple, robust) ----------------------------------------
 if (!requireNamespace("pROC", quietly = TRUE)) install.packages("pROC")
@@ -308,7 +319,7 @@ roc_df <- data.frame(
 )
 
 ggplot(roc_df, aes(x = fpr, y = tpr)) +
-  geom_path(size = 1.2) +
+  geom_path(linewidth = 1.2) +
   geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "gray50") +
   coord_equal() +
   labs(
@@ -349,7 +360,7 @@ ggplot(df, aes(x = distance, fill = scenario)) +
 
 labels <- c(rep("Neutral",   length(d_neutral_l2)),
             rep("Selective", length(d_selective_l2)))
-scores <- c(d_neutral, d_selective)   # higher => more likely Selective
+scores <- c(d_neutral_l2, d_selective)   # higher => more likely Selective
 
 # --- Option A: pROC (simple, robust) ----------------------------------------
 if (!requireNamespace("pROC", quietly = TRUE)) install.packages("pROC")

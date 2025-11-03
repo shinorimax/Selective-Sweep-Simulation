@@ -1,3 +1,4 @@
+install.packages("ICSNP")
 library(ICSNP)
 library(fmatrix)
 
@@ -16,6 +17,8 @@ myHotelling <- function(x, y, ...){
   return(NA)
 }
 
+
+## generates 1000 trees with 25 tips trees with beta=b
 gen_x <- function(b, m = 1000, n = 25, ...){
   x <- rEncod(m = m, n = n, b = b, ...)
   x <- lapply(x, Fmat_from_myencod)

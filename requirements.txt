@@ -4,6 +4,7 @@ tskit
 tqdm
 ete3
 daiquiri
+tsinfer
 
 # data processing
 pandas

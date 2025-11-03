@@ -31,5 +31,10 @@ SliM/outs/
 SliM/checkpoints/
 SliM/slimfiles/
 SliM/etas/
+SliM/sim.vcz
+SliM/tsinfer_test
+
+## Exclude data storage in Analysis/phylodyn
+Analysis/phylodyn/data/
 
 README.md

@@ -104,3 +104,21 @@ if __name__ == "__main__":
 
     ts.dump(out_path)
     print("it's done")
+
+
+# * **SLiM starts from when you initialize the population** - this could be when a positive mutation arises, or at some arbitrary generation you choose to start tracking
+
+# * **Starting frequency ≠ MRCA** - Even if you start with a single copy of the beneficial mutation (frequency 1/2N in a diploid population), the population as a whole has many other lineages that were already present. These lineages have their own ancestry that predates your simulation start time
+
+# * **Multiple uncoalesced branches at start** - Your simulation begins with a forest of lineages:
+#   - One (or a few) lineages carry the beneficial mutation
+#   - Many other lineages don't carry it
+#   - All these lineages existed before time 0 of your simulation, but their relationships to each other aren't known
+
+# * **Recapitation completes the tree** - By running a coalescent simulation backward from your SLiM start time, recapitation merges all those initial branches back to their ultimate common ancestor
+
+# ## The Key Insight
+
+# SLiM doesn't know (or care) about the genealogical relationships among the lineages that existed at generation 0. It just treats them as the starting population and simulates forward. Recapitation fills in that "pre-history" to give you a complete, statistically valid tree sequence.
+
+# This is particularly important for selection simulations because you need that neutral ancestral diversity as the background upon which selection acts.
