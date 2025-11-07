@@ -1,13 +1,13 @@
 ---
-title: "chromosome_wide_Fmat_analysis"
+title: "chromosome_wide_FWmat_analysis"
 author: "Shinnosuke Yagi"
-date: "2025-11-02"
+date: "2025-11-03"
 output: html_document
 ---
 
 ## Overview
 
-1. Take weighted average of all F-matrices on a chromosome
+1. Take weighted average of all Weighted F(FW)-matrices on a chromosome
 2. Take distance to empirically estimated Kingman
 
 ## Import Libraries
@@ -34,8 +34,8 @@ library(phylodyn)
 ## Calculate and store d-1 distance to Kingman
 
 ```{r}
-F_weighted_neutrals <- readRDS("data/F_weighted_average_neutrals.rds")
-F_weighted_selectives_s0.01_f0.75 <- readRDS("data/F_weighted_average_selectives_s0.01_f0.75.rds")
+FW_weighted_neutrals <- readRDS("data/FW_weighted_average_neutrals.rds")
+FW_weighted_selectives_s0.01_f0.75 <- readRDS("data/FW_weighted_average_selectives_s0.01_f0.75.rds")
 
 # --- Helper function for L1 distance (unweighted) ----
 dist_d1 <- function(F1, F2) {
@@ -43,26 +43,26 @@ dist_d1 <- function(F1, F2) {
 }
 
 # --- 1. Split the neutral list: use the second half for testing ---------------
-n_total <- length(F_weighted_neutrals)
+n_total <- length(FW_weighted_neutrals)
 half_idx <- floor(n_total / 2) + 1
-F_weighted_list_neutral_test <- F_weighted_neutrals[half_idx:n_total]
+FW_weighted_list_neutral_test <- FW_weighted_neutrals[half_idx:n_total]
 
 # --- 2. Load or reference the selective set ----------------------------------
-F_weighted_list_selective <- F_weighted_selectives_s0.01_f0.75
+FW_weighted_list_selective <- FW_weighted_selectives_s0.01_f0.75
 
 # --- 3. Load or reference the empirical mean F-matrix ------------------------
-F_mean_neutral <- readRDS("data/F_empirical_kingman.rds")
+FW_mean_neutral <- readRDS("data/FW_empirical_kingman.rds")
 
 # --- 4. Compute distances to empirical mean ----------------------------------
 d_neutral_test <- vapply(
-  F_weighted_list_neutral_test,
-  function(F) dist_d1(F, F_mean_neutral),
+  FW_weighted_list_neutral_test,
+  function(F) dist_d1(F, FW_mean_neutral),
   numeric(1)
 )
 
 d_selective <- vapply(
-  F_weighted_list_selective,
-  function(F) dist_d1(F, F_mean_neutral),
+  FW_weighted_list_selective,
+  function(F) dist_d1(F, FW_mean_neutral),
   numeric(1)
 )
 
@@ -82,7 +82,7 @@ ggplot(df_dist, aes(x = distance, fill = scenario)) +
   geom_density(alpha = 0.4, adjust = 1.2) +
   theme_minimal(base_size = 14) +
   labs(
-    title = "Distribution of d1 Distances to Neutral Mean F-matrix",
+    title = "Distribution of d1 Weigted Distances to Neutral Mean F-matrix",
     x = expression(paste("Distance (", d[1], ")")),
     y = "Density"
   ) +
@@ -137,8 +137,8 @@ ggplot(roc_df, aes(x = fpr, y = tpr)) +
 ## Calculate and store d2-distance to Kingman
 
 ```{r}
-F_weighted_neutrals <- readRDS("data/F_weighted_average_neutrals.rds")
-F_weighted_selectives_s0.01_f0.75 <- readRDS("data/F_weighted_average_selectives_s0.01_f0.75.rds")
+FW_weighted_neutrals <- readRDS("data/FW_weighted_average_neutrals.rds")
+FW_weighted_selectives_s0.01_f0.75 <- readRDS("data/FW_weighted_average_selectives_s0.01_f0.75.rds")
 
 # --- Helper function for L2 (Frobenius) distance -----------------------------
 dist_d2 <- function(F1, F2) {
@@ -146,26 +146,26 @@ dist_d2 <- function(F1, F2) {
 }
 
 # --- 1. Split the neutral list: use the second half for testing ---------------
-n_total <- length(F_weighted_neutrals)
+n_total <- length(FW_weighted_neutrals)
 half_idx <- floor(n_total / 2) + 1
-F_weighted_list_neutral_test <- F_weighted_neutrals[half_idx:n_total]
+FW_weighted_list_neutral_test <- FW_weighted_neutrals[half_idx:n_total]
 
 # --- 2. Load or reference the selective set ----------------------------------
-F_weighted_list_selective <- F_weighted_selectives_s0.01_f0.75
+FW_weighted_list_selective <- FW_weighted_selectives_s0.01_f0.75
 
 # --- 3. Load or reference the empirical mean F-matrix ------------------------
-F_mean_neutral <- readRDS("data/F_empirical_kingman.rds")
+FW_mean_neutral <- readRDS("data/FW_empirical_kingman.rds")
 
 # --- 4. Compute distances to empirical mean (L2) ------------------------------
 d_neutral_test <- vapply(
-  F_weighted_list_neutral_test,
-  function(F) dist_d2(F, F_mean_neutral),
+  FW_weighted_list_neutral_test,
+  function(F) dist_d2(F, FW_mean_neutral),
   numeric(1)
 )
 
 d_selective <- vapply(
-  F_weighted_list_selective,
-  function(F) dist_d2(F, F_mean_neutral),
+  FW_weighted_list_selective,
+  function(F) dist_d2(F, FW_mean_neutral),
   numeric(1)
 )
 
@@ -185,7 +185,7 @@ ggplot(df_dist, aes(x = distance, fill = scenario)) +
   geom_density(alpha = 0.4, adjust = 1.2) +
   theme_minimal(base_size = 14) +
   labs(
-    title = "Distribution of d2 Distances to Neutral Mean F-matrix",
+    title = "Distribution of d2 Weighted Distances to Neutral Mean F-matrix",
     x = expression(paste("Distance (", d[1], ")")),
     y = "Density"
   ) +

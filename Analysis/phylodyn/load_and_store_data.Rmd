@@ -36,8 +36,6 @@ source("load_and_store_data_utils.R")
 if (!dir.exists("data")) dir.create("data")
 
 data_dir <- "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/Selective-Sweep-Simulation/SliM/trees_newick"
-
-neutral_prefix   <- "^r300.*\\.tree$"
 ```
 
 ## Load Trees
@@ -47,18 +45,19 @@ neutrals[[i]][[j]] gives the jth tree from the ith simulation under the given sc
 
 ```{r}
 # --- Define filename prefixes ----------------------------------------------
-selective_s0.02_f0.25_prefix <- "^r301.*\\.tree$"
-selective_s0.02_f0.5_prefix  <- "^r302.*\\.tree$"
-selective_s0.02_f0.75_prefix <- "^r303.*\\.tree$"
-selective_s0.01_f0.25_prefix <- "^r304.*\\.tree$"
-selective_s0.01_f0.5_prefix  <- "^r305.*\\.tree$"
-selective_s0.01_f0.75_prefix <- "^r306.*\\.tree$"
-selective_s0.003_f0.25_prefix <- "^r307.*\\.tree$"
-selective_s0.003_f0.5_prefix  <- "^r308.*\\.tree$"
-selective_s0.003_f0.75_prefix <- "^r309.*\\.tree$"
-selective_s0.001_f0.25_prefix <- "^r310.*\\.tree$"
-selective_s0.001_f0.5_prefix  <- "^r311.*\\.tree$"
-selective_s0.001_f0.75_prefix <- "^r312.*\\.tree$"
+neutral_prefix   <- "^r400.*\\.tree$"
+# selective_s0.02_f0.25_prefix <- "^r301.*\\.tree$"
+# selective_s0.02_f0.5_prefix  <- "^r302.*\\.tree$"
+# selective_s0.02_f0.75_prefix <- "^r303.*\\.tree$"
+# selective_s0.01_f0.25_prefix <- "^r304.*\\.tree$"
+# selective_s0.01_f0.5_prefix  <- "^r305.*\\.tree$"
+selective_s0.01_f0.75_prefix <- "^r401.*\\.tree$"
+# selective_s0.003_f0.25_prefix <- "^r307.*\\.tree$"
+# selective_s0.003_f0.5_prefix  <- "^r308.*\\.tree$"
+# selective_s0.003_f0.75_prefix <- "^r309.*\\.tree$"
+# selective_s0.001_f0.25_prefix <- "^r310.*\\.tree$"
+# selective_s0.001_f0.5_prefix  <- "^r311.*\\.tree$"
+# selective_s0.001_f0.75_prefix <- "^r312.*\\.tree$"
 
 # --- Helper function to read & save ----------------------------------------
 read_and_save <- function(pattern_name, prefix) {
@@ -72,42 +71,26 @@ read_and_save <- function(pattern_name, prefix) {
 }
 
 # --- Load and save data -----------------------------------------------------
-neutrals <- read_and_save("neutrals", neutral_prefix)
+neutrals <- read_and_save("neutrals_n10", neutral_prefix)
 
-selectives_s0.02_f0.25 <- read_and_save("selectives_s0.02_f0.25", selective_s0.02_f0.25_prefix)
-selectives_s0.02_f0.5  <- read_and_save("selectives_s0.02_f0.5",  selective_s0.02_f0.5_prefix)
-selectives_s0.02_f0.75 <- read_and_save("selectives_s0.02_f0.75", selective_s0.02_f0.75_prefix)
+# selectives_s0.02_f0.25 <- read_and_save("selectives_s0.02_f0.25", selective_s0.02_f0.25_prefix)
+# selectives_s0.02_f0.5  <- read_and_save("selectives_s0.02_f0.5",  selective_s0.02_f0.5_prefix)
+# selectives_s0.02_f0.75 <- read_and_save("selectives_s0.02_f0.75", selective_s0.02_f0.75_prefix)
+# 
+# selectives_s0.01_f0.25 <- read_and_save("selectives_s0.01_f0.25", selective_s0.01_f0.25_prefix)
+# selectives_s0.01_f0.5  <- read_and_save("selectives_s0.01_f0.5",  selective_s0.01_f0.5_prefix)
+selectives_s0.01_f0.75 <- read_and_save("selectives_n10_s0.01_f0.75", selective_s0.01_f0.75_prefix)
 
-selectives_s0.01_f0.25 <- read_and_save("selectives_s0.01_f0.25", selective_s0.01_f0.25_prefix)
-selectives_s0.01_f0.5  <- read_and_save("selectives_s0.01_f0.5",  selective_s0.01_f0.5_prefix)
-selectives_s0.01_f0.75 <- read_and_save("selectives_s0.01_f0.75", selective_s0.01_f0.75_prefix)
-
-selectives_s0.003_f0.25 <- read_and_save("selectives_s0.003_f0.25", selective_s0.003_f0.25_prefix)
-selectives_s0.003_f0.5  <- read_and_save("selectives_s0.003_f0.5",  selective_s0.003_f0.5_prefix)
-selectives_s0.003_f0.75 <- read_and_save("selectives_s0.003_f0.75", selective_s0.003_f0.75_prefix)
-
-selectives_s0.001_f0.25 <- read_and_save("selectives_s0.001_f0.25", selective_s0.001_f0.25_prefix)
-selectives_s0.001_f0.5  <- read_and_save("selectives_s0.001_f0.5",  selective_s0.001_f0.5_prefix)
-selectives_s0.001_f0.75 <- read_and_save("selectives_s0.001_f0.75", selective_s0.001_f0.75_prefix)
+# selectives_s0.003_f0.25 <- read_and_save("selectives_s0.003_f0.25", selective_s0.003_f0.25_prefix)
+# selectives_s0.003_f0.5  <- read_and_save("selectives_s0.003_f0.5",  selective_s0.003_f0.5_prefix)
+# selectives_s0.003_f0.75 <- read_and_save("selectives_s0.003_f0.75", selective_s0.003_f0.75_prefix)
+# 
+# selectives_s0.001_f0.25 <- read_and_save("selectives_s0.001_f0.25", selective_s0.001_f0.25_prefix)
+# selectives_s0.001_f0.5  <- read_and_save("selectives_s0.001_f0.5",  selective_s0.001_f0.5_prefix)
+# selectives_s0.001_f0.75 <- read_and_save("selectives_s0.001_f0.75", selective_s0.001_f0.75_prefix)
 
 # --- Summary ---------------------------------------------------------------
 cat("Neutral files   :", length(neutrals), "\n")
-```
-
-```{r}
-# --- Helper function to read & save ----------------------------------------
-read_and_save <- function(pattern_name, prefix) {
-  cat("Reading:", pattern_name, "\n")
-  obj <- read_files_by_pattern(data_dir, prefix)
-  
-  saveRDS(obj, file = file.path("data", paste0(pattern_name, ".rds")))
-  cat("  Saved ->", file.path("data", paste0(pattern_name, ".rds")), "\n\n")
-  
-  return(obj)
-}
-
-# --- Load and save data -----------------------------------------------------
-neutrals <- read_and_save("neutrals", neutral_prefix)
 ```
 
 ## Calculate F-matrix for each trees
@@ -115,96 +98,319 @@ neutrals <- read_and_save("neutrals", neutral_prefix)
 Fs is a large list of all f-matrices. 
 
 ```{r}
-# --- Compute & save F-matrices while preserving nesting ---------------------
-compute_and_save_Fs_nested <- function(obj, name_prefix, out_dir = "data", tol = 8L,
-                                       show_progress = TRUE) {
-  n_chr <- length(obj)
-  total_trees <- sum(vapply(obj, length, integer(1L)))
-
-  if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
-  if (show_progress) pb <- txtProgressBar(min = 0, max = total_trees, style = 3)
-
-  Fs_nested <- vector("list", n_chr)
-  if (!is.null(names(obj))) names(Fs_nested) <- names(obj)
-
-  k <- 0L
-  for (i in seq_along(obj)) {
-    trees_i <- obj[[i]]
-    Fi <- vector("list", length(trees_i))
-    if (!is.null(names(trees_i))) names(Fi) <- names(trees_i)
-
-    for (j in seq_along(trees_i)) {
-      Fi[[j]] <- gen_Fmat(trees_i[[j]], tol = tol)
-      attr(Fi[[j]], "src_idx") <- c(i = i, j = j)  # optional trace-back
-      k <- k + 1L
-      if (show_progress) setTxtProgressBar(pb, k)
-    }
-    Fs_nested[[i]] <- Fi
-  }
-  if (show_progress) close(pb)
-
-  out_path <- file.path(out_dir, paste0("Fs_nested_", name_prefix, ".rds"))
-  saveRDS(Fs_nested, out_path)
-  cat("Saved nested F-matrices ->", out_path, "\n")
-
-  invisible(Fs_nested)
-}
-
 # --- Example -----------------------------------------------------------------
-Fs_neutrals <- compute_and_save_Fs_nested(neutrals, "neutrals")
+Fs_neutrals <- compute_and_save_Fs_nested(neutrals, "neutrals_n10")
+# Fs_s0.02_f0.25 <- compute_and_save_Fs_nested(selectives_s0.02_f0.25, "selectives_s0.02_f0.25")
+# Fs_s0.02_f0.5  <- compute_and_save_Fs_nested(selectives_s0.02_f0.5,  "selectives_s0.02_f0.5")
+# Fs_s0.02_f0.75 <- compute_and_save_Fs_nested(selectives_s0.02_f0.75, "selectives_s0.02_f0.75")
+# 
+# Fs_s0.01_f0.25 <- compute_and_save_Fs_nested(selectives_s0.01_f0.25, "selectives_s0.01_f0.25")
+# Fs_s0.01_f0.5  <- compute_and_save_Fs_nested(selectives_s0.01_f0.5,  "selectives_s0.01_f0.5")
+Fs_s0.01_f0.75 <- compute_and_save_Fs_nested(selectives_s0.01_f0.75, "selectives_n10_s0.01_f0.75")
+
+# Fs_s0.003_f0.25 <- compute_and_save_Fs_nested(selectives_s0.003_f0.25, "selectives_s0.003_f0.25")
+# Fs_s0.003_f0.5  <- compute_and_save_Fs_nested(selectives_s0.003_f0.5,  "selectives_s0.003_f0.5")
+# Fs_s0.003_f0.75 <- compute_and_save_Fs_nested(seulectives_s0.003_f0.75, "selectives_s0.003_f0.75")
+# 
+# Fs_s0.001_f0.25 <- compute_and_save_Fs_nested(selectives_s0.001_f0.25, "selectives_s0.001_f0.25")
+# Fs_s0.001_f0.5  <- compute_and_save_Fs_nested(selectives_s0.001_f0.5,  "selectives_s0.001_f0.5")
+# Fs_s0.001_f0.75 <- compute_and_save_Fs_nested(selectives_s0.001_f0.75, "selectives_s0.001_f0.75")
 # Now:
 #   Fs_neutrals[[1]][[1]]  # first tree on the first chromosome
 ```
 
+## Compute weighted average summary F-matrix for each chromosome
 
 ```{r}
-# --- Function to compute F-matrices and save as .rds ------------------------
-compute_and_save_Fs <- function(obj, name_prefix, out_dir = "data") {
-  cat("\n--- Processing:", name_prefix, "------------------------------------\n")
-  
-  all_trees <- flatten_trees(obj)
-  n_trees <- length(all_trees)
-  cat(sprintf("Found %d trees in %s.\n", n_trees, name_prefix))
-  
-  Fs <- vector("list", n_trees)
-  pb <- txtProgressBar(min = 0, max = n_trees, style = 3)
-  
-  for (k in seq_len(n_trees)) {
-    Fs[[k]] <- gen_Fmat(all_trees[[k]], tol = 8)  # assumes gen_Fmat is loaded
-    setTxtProgressBar(pb, k)
-  }
-  close(pb)
-  
-  # save with consistent naming convention
-  out_path <- file.path(out_dir, paste0("Fs_", name_prefix, ".rds"))
-  saveRDS(Fs, out_path)
-  cat("Saved F-matrices ->", out_path, "\n")
-  
-  invisible(Fs)
-}
+# --- Load and compute weighted F matrices for all conditions -----------------
 
-# --- Compute and save Fs for each dataset -----------------------------------
-Fs_neutrals <- compute_and_save_Fs(neutrals, "neutrals")
+# Neutral
+Fs_nested_neutrals <- readRDS("data/Fs_nested_neutrals_n10.rds")
+F_weighted_neutrals <- compute_weighted_Fs(
+  Fs_nested = Fs_nested_neutrals,
+  breaks_dir = data_dir,
+  output_name = "F_weighted_average_neutrals_n10.rds",
+  store_dir = "data"
+)
 
-Fs_s0.02_f0.25 <- compute_and_save_Fs_nested(selectives_s0.02_f0.25, "selectives_s0.02_f0.25")
-Fs_s0.02_f0.5  <- compute_and_save_Fs_nested(selectives_s0.02_f0.5,  "selectives_s0.02_f0.5")
-Fs_s0.02_f0.75 <- compute_and_save_Fs_nested(selectives_s0.02_f0.75, "selectives_s0.02_f0.75")
+# # s = 0.02
+# Fs_nested_selectives_s0.02_f0.25 <- readRDS("data/Fs_nested_selectives_s0.02_f0.25.rds")
+# F_weighted_selectives_s0.02_f0.25 <- compute_weighted_Fs(
+#   Fs_nested = Fs_nested_selectives_s0.02_f0.25,
+#   breaks_dir = data_dir,
+#   output_name = "F_weighted_average_selectives_s0.02_f0.25.rds",
+#   store_dir = "data"
+# )
+# 
+# Fs_nested_selectives_s0.02_f0.5 <- readRDS("data/Fs_nested_selectives_s0.02_f0.5.rds")
+# F_weighted_selectives_s0.02_f0.5 <- compute_weighted_Fs(
+#   Fs_nested = Fs_nested_selectives_s0.02_f0.5,
+#   breaks_dir = data_dir,
+#   output_name = "F_weighted_average_selectives_s0.02_f0.5.rds",
+#   store_dir = "data"
+# )
+# 
+# Fs_nested_selectives_s0.02_f0.75 <- readRDS("data/Fs_nested_selectives_s0.02_f0.75.rds")
+# F_weighted_selectives_s0.02_f0.75 <- compute_weighted_Fs(
+#   Fs_nested = Fs_nested_selectives_s0.02_f0.75,
+#   breaks_dir = data_dir,
+#   output_name = "F_weighted_average_selectives_s0.02_f0.75.rds",
+#   store_dir = "data"
+# )
+# 
+# # s = 0.01
+# Fs_nested_selectives_s0.01_f0.25 <- readRDS("data/Fs_nested_selectives_s0.01_f0.25.rds")
+# F_weighted_selectives_s0.01_f0.25 <- compute_weighted_Fs(
+#   Fs_nested = Fs_nested_selectives_s0.01_f0.25,
+#   breaks_dir = data_dir,
+#   output_name = "F_weighted_average_selectives_s0.01_f0.25.rds",
+#   store_dir = "data"
+# )
+# 
+# Fs_nested_selectives_s0.01_f0.5 <- readRDS("data/Fs_nested_selectives_s0.01_f0.5.rds")
+# F_weighted_selectives_s0.01_f0.5 <- compute_weighted_Fs(
+#   Fs_nested = Fs_nested_selectives_s0.01_f0.5,
+#   breaks_dir = data_dir,
+#   output_name = "F_weighted_average_selectives_s0.01_f0.5.rds",
+#   store_dir = "data"
+# )
 
-Fs_s0.01_f0.25 <- compute_and_save_Fs_nested(selectives_s0.01_f0.25, "selectives_s0.01_f0.25")
-Fs_s0.01_f0.5  <- compute_and_save_Fs_nested(selectives_s0.01_f0.5,  "selectives_s0.01_f0.5")
-Fs_s0.01_f0.75 <- compute_and_save_Fs_nested(selectives_s0.01_f0.75, "selectives_s0.01_f0.75")
+Fs_nested_selectives_s0.01_f0.75 <- readRDS("data/Fs_nested_selectives_n10_s0.01_f0.75.rds")
+F_weighted_selectives_s0.01_f0.75 <- compute_weighted_Fs(
+  Fs_nested = Fs_nested_selectives_s0.01_f0.75,
+  breaks_dir = data_dir,
+  output_name = "F_weighted_average_selectives_n10_s0.01_f0.75.rds",
+  store_dir = "data"
+)
 
-Fs_s0.003_f0.25 <- compute_and_save_Fs_nested(selectives_s0.003_f0.25, "selectives_s0.003_f0.25")
-Fs_s0.003_f0.5  <- compute_and_save_Fs_nested(selectives_s0.003_f0.5,  "selectives_s0.003_f0.5")
-Fs_s0.003_f0.75 <- compute_and_save_Fs_nested(selectives_s0.003_f0.75, "selectives_s0.003_f0.75")
-
-Fs_s0.001_f0.25 <- compute_and_save_Fs_nested(selectives_s0.001_f0.25, "selectives_s0.001_f0.25")
-Fs_s0.001_f0.5  <- compute_and_save_Fs_nested(selectives_s0.001_f0.5,  "selectives_s0.001_f0.5")
-Fs_s0.001_f0.75 <- compute_and_save_Fs_nested(selectives_s0.001_f0.75, "selectives_s0.001_f0.75")
+# # s = 0.003
+# Fs_nested_selectives_s0.003_f0.25 <- readRDS("data/Fs_nested_selectives_s0.003_f0.25.rds")
+# F_weighted_selectives_s0.003_f0.25 <- compute_weighted_Fs(
+#   Fs_nested = Fs_nested_selectives_s0.003_f0.25,
+#   breaks_dir = data_dir,
+#   output_name = "F_weighted_average_selectives_s0.003_f0.25.rds",
+#   store_dir = "data"
+# )
+# 
+# Fs_nested_selectives_s0.003_f0.5 <- readRDS("data/Fs_nested_selectives_s0.003_f0.5.rds")
+# F_weighted_selectives_s0.003_f0.5 <- compute_weighted_Fs(
+#   Fs_nested = Fs_nested_selectives_s0.003_f0.5,
+#   breaks_dir = data_dir,
+#   output_name = "F_weighted_average_selectives_s0.003_f0.5.rds",
+#   store_dir = "data"
+# )
+# 
+# Fs_nested_selectives_s0.003_f0.75 <- readRDS("data/Fs_nested_selectives_s0.003_f0.75.rds")
+# F_weighted_selectives_s0.003_f0.75 <- compute_weighted_Fs(
+#   Fs_nested = Fs_nested_selectives_s0.003_f0.75,
+#   breaks_dir = data_dir,
+#   output_name = "F_weighted_average_selectives_s0.003_f0.75.rds",
+#   store_dir = "data"
+# )
+# 
+# # s = 0.001
+# Fs_nested_selectives_s0.001_f0.25 <- readRDS("data/Fs_nested_selectives_s0.001_f0.25.rds")
+# F_weighted_selectives_s0.001_f0.25 <- compute_weighted_Fs(
+#   Fs_nested = Fs_nested_selectives_s0.001_f0.25,
+#   breaks_dir = data_dir,
+#   output_name = "F_weighted_average_selectives_s0.001_f0.25.rds",
+#   store_dir = "data"
+# )
+# 
+# Fs_nested_selectives_s0.001_f0.5 <- readRDS("data/Fs_nested_selectives_s0.001_f0.5.rds")
+# F_weighted_selectives_s0.001_f0.5 <- compute_weighted_Fs(
+#   Fs_nested = Fs_nested_selectives_s0.001_f0.5,
+#   breaks_dir = data_dir,
+#   output_name = "F_weighted_average_selectives_s0.001_f0.5.rds",
+#   store_dir = "data"
+# )
+# 
+# Fs_nested_selectives_s0.001_f0.75 <- readRDS("data/Fs_nested_selectives_s0.001_f0.75.rds")
+# F_weighted_selectives_s0.001_f0.75 <- compute_weighted_Fs(
+#   Fs_nested = Fs_nested_selectives_s0.001_f0.75,
+#   breaks_dir = data_dir,
+#   output_name = "F_weighted_average_selectives_s0.001_f0.75.rds",
+#   store_dir = "data"
+# )
 ```
 
-## Estimate empirical Kingman using half of the neutral trees
+## Estimate Empirical Kingman using first half of neutrals
 
 ```{r}
+# Example usage:
+# Fs_nested_neutrals <- readRDS("data/Fs_nested_neutrals.rds")
+F_empirical_kingman <- compute_empirical_kingman(F_weighted_neutrals)
+```
 
+## Calculate Weighted F-matrix (FW) for each trees
+
+```{r}
+# --- Compute & Save Weighted F-matrices for All Scenarios --------------------
+
+# Neutral
+# neutrals <- readRDS("data/neutrals.rds")
+# FWs_neutrals <- compute_and_save_FWs_nested(neutrals, "neutrals")
+
+# # s = 0.02
+# selectives_s0.02_f0.25 <- readRDS("data/selectives_s0.02_f0.25.rds")
+# FWs_selectives_s0.02_f0.25 <- compute_and_save_FWs_nested(selectives_s0.02_f0.25, "selectives_s0.02_f0.25")
+#
+# selectives_s0.02_f0.5 <- readRDS("data/selectives_s0.02_f0.5.rds")
+# FWs_selectives_s0.02_f0.5 <- compute_and_save_FWs_nested(selectives_s0.02_f0.5, "selectives_s0.02_f0.5")
+
+# selectives_s0.02_f0.75 <- readRDS("data/selectives_s0.02_f0.75.rds")
+# FWs_selectives_s0.02_f0.75 <- compute_and_save_FWs_nested(selectives_s0.02_f0.75, "selectives_s0.02_f0.75", tol = 4L)
+
+# # s = 0.01
+# selectives_s0.01_f0.25 <- readRDS("data/selectives_s0.01_f0.25.rds")
+# FWs_selectives_s0.01_f0.25 <- compute_and_save_FWs_nested(selectives_s0.01_f0.25, "selectives_s0.01_f0.25")
+# 
+# selectives_s0.01_f0.5 <- readRDS("data/selectives_s0.01_f0.5.rds")
+# FWs_selectives_s0.01_f0.5 <- compute_and_save_FWs_nested(selectives_s0.01_f0.5, "selectives_s0.01_f0.5")
+# 
+# selectives_s0.01_f0.75 <- readRDS("data/selectives_s0.01_f0.75.rds")
+# FWs_selectives_s0.01_f0.75 <- compute_and_save_FWs_nested(selectives_s0.01_f0.75, "selectives_s0.01_f0.75")
+
+# s = 0.003
+selectives_s0.003_f0.25 <- readRDS("data/selectives_s0.003_f0.25.rds")
+FWs_selectives_s0.003_f0.25 <- compute_and_save_FWs_nested(selectives_s0.003_f0.25, "selectives_s0.003_f0.25", tol=4)
+
+selectives_s0.003_f0.5 <- readRDS("data/selectives_s0.003_f0.5.rds")
+FWs_selectives_s0.003_f0.5 <- compute_and_save_FWs_nested(selectives_s0.003_f0.5, "selectives_s0.003_f0.5")
+
+selectives_s0.003_f0.75 <- readRDS("data/selectives_s0.003_f0.75.rds")
+FWs_selectives_s0.003_f0.75 <- compute_and_save_FWs_nested(selectives_s0.003_f0.75, "selectives_s0.003_f0.75")
+
+# s = 0.001
+selectives_s0.001_f0.25 <- readRDS("data/selectives_s0.001_f0.25.rds")
+FWs_selectives_s0.001_f0.25 <- compute_and_save_FWs_nested(selectives_s0.001_f0.25, "selectives_s0.001_f0.25")
+
+selectives_s0.001_f0.5 <- readRDS("data/selectives_s0.001_f0.5.rds")
+FWs_selectives_s0.001_f0.5 <- compute_and_save_FWs_nested(selectives_s0.001_f0.5, "selectives_s0.001_f0.5")
+
+selectives_s0.001_f0.75 <- readRDS("data/selectives_s0.001_f0.75.rds")
+FWs_selectives_s0.001_f0.75 <- compute_and_save_FWs_nested(selectives_s0.001_f0.75, "selectives_s0.001_f0.75")
+```
+
+## Calculate weighted-average Weighted F-matrix (FW) for each trees
+
+```{r}
+# --- Load and compute weighted-average of Weighted F-matrices (FWs) ----------
+
+# Neutral
+FWs_nested_neutrals <- readRDS("data/FWs_nested_neutrals.rds")
+FW_weighted_neutrals <- compute_weighted_Fs(
+  Fs_nested = FWs_nested_neutrals,
+  breaks_dir = data_dir,
+  output_name = "FW_weighted_average_neutrals.rds",
+  store_dir = "data"
+)
+
+# # s = 0.02
+FWs_nested_selectives_s0.02_f0.25 <- readRDS("data/FWs_nested_selectives_s0.02_f0.25.rds")
+F_weighted_selectives_s0.02_f0.25 <- compute_weighted_Fs(
+  Fs_nested = FWs_nested_selectives_s0.02_f0.25,
+  breaks_dir = data_dir,
+  output_name = "FW_weighted_average_selectives_s0.02_f0.25.rds",
+  store_dir = "data"
+)
+
+FWs_nested_selectives_s0.02_f0.5 <- readRDS("data/FWs_nested_selectives_s0.02_f0.5.rds")
+F_weighted_selectives_s0.02_f0.5 <- compute_weighted_Fs(
+  Fs_nested = FWs_nested_selectives_s0.02_f0.5,
+  breaks_dir = data_dir,
+  output_name = "FW_weighted_average_selectives_s0.02_f0.5.rds",
+  store_dir = "data"
+)
+
+FWs_nested_selectives_s0.02_f0.75 <- readRDS("data/FWs_nested_selectives_s0.02_f0.75.rds")
+F_weighted_selectives_s0.02_f0.75 <- compute_weighted_Fs(
+  Fs_nested = FWs_nested_selectives_s0.02_f0.75,
+  breaks_dir = data_dir,
+  output_name = "FW_weighted_average_selectives_s0.02_f0.75.rds",
+  store_dir = "data"
+)
+
+# s = 0.01
+FWs_nested_selectives_s0.01_f0.25 <- readRDS("data/FWs_nested_selectives_s0.01_f0.25.rds")
+F_weighted_selectives_s0.01_f0.25 <- compute_weighted_Fs(
+  Fs_nested = FWs_nested_selectives_s0.01_f0.25,
+  breaks_dir = data_dir,
+  output_name = "FW_weighted_average_selectives_s0.01_f0.25.rds",
+  store_dir = "data"
+)
+#
+FWs_nested_selectives_s0.01_f0.5 <- readRDS("data/FWs_nested_selectives_s0.01_f0.5.rds")
+F_weighted_selectives_s0.01_f0.5 <- compute_weighted_Fs(
+  Fs_nested = FWs_nested_selectives_s0.01_f0.5,
+  breaks_dir = data_dir,
+  output_name = "FW_weighted_average_selectives_s0.01_f0.5.rds",
+  store_dir = "data"
+)
+
+FWs_nested_selectives_s0.01_f0.75 <- readRDS("data/FWs_nested_selectives_s0.01_f0.75.rds")
+FW_weighted_selectives_s0.01_f0.75 <- compute_weighted_Fs(
+  Fs_nested = FWs_nested_selectives_s0.01_f0.75,
+  breaks_dir = data_dir,
+  output_name = "FW_weighted_average_selectives_s0.01_f0.75.rds",
+  store_dir = "data"
+)
+# 
+# # s = 0.003
+FWs_nested_selectives_s0.003_f0.25 <- readRDS("data/FWs_nested_selectives_s0.003_f0.25.rds")
+F_weighted_selectives_s0.003_f0.25 <- compute_weighted_Fs(
+  Fs_nested = FWs_nested_selectives_s0.003_f0.25,
+  breaks_dir = data_dir,
+  output_name = "FW_weighted_average_selectives_s0.003_f0.25.rds",
+  store_dir = "data"
+)
+# 
+FWs_nested_selectives_s0.003_f0.5 <- readRDS("data/FWs_nested_selectives_s0.003_f0.5.rds")
+F_weighted_selectives_s0.003_f0.5 <- compute_weighted_Fs(
+  Fs_nested = FWs_nested_selectives_s0.003_f0.5,
+  breaks_dir = data_dir,
+  output_name = "FW_weighted_average_selectives_s0.003_f0.5.rds",
+  store_dir = "data"
+)
+# 
+FWs_nested_selectives_s0.003_f0.75 <- readRDS("data/FWs_nested_selectives_s0.003_f0.75.rds")
+F_weighted_selectives_s0.003_f0.75 <- compute_weighted_Fs(
+  Fs_nested = FWs_nested_selectives_s0.003_f0.75,
+  breaks_dir = data_dir,
+  output_name = "FW_weighted_average_selectives_s0.003_f0.75.rds",
+  store_dir = "data"
+)
+# 
+# # s = 0.001
+FWs_nested_selectives_s0.001_f0.25 <- readRDS("data/FWs_nested_selectives_s0.001_f0.25.rds")
+F_weighted_selectives_s0.001_f0.25 <- compute_weighted_Fs(
+  Fs_nested = FWs_nested_selectives_s0.001_f0.25,
+  breaks_dir = data_dir,
+  output_name = "FW_weighted_average_selectives_s0.001_f0.25.rds",
+  store_dir = "data"
+)
+# 
+FWs_nested_selectives_s0.001_f0.5 <- readRDS("data/FWs_nested_selectives_s0.001_f0.5.rds")
+F_weighted_selectives_s0.001_f0.5 <- compute_weighted_Fs(
+  Fs_nested = FWs_nested_selectives_s0.001_f0.5,
+  breaks_dir = data_dir,
+  output_name = "FW_weighted_average_selectives_s0.001_f0.5.rds",
+  store_dir = "data"
+)
+# 
+FWs_nested_selectives_s0.001_f0.75 <- readRDS("data/FWs_nested_selectives_s0.001_f0.75.rds")
+F_weighted_selectives_s0.001_f0.75 <- compute_weighted_Fs(
+  Fs_nested = FWs_nested_selectives_s0.001_f0.75,
+  breaks_dir = data_dir,
+  output_name = "FW_weighted_average_selectives_s0.001_f0.75.rds",
+  store_dir = "data"
+)
+```
+
+## Estimate Empirical Kingman FW matrix using first half of neutrals
+
+```{r}
+# Example usage:
+# FWs_nested_neutrals <- readRDS("data/FWs_nested_neutrals.rds")
+FW_empirical_kingman <- compute_empirical_kingman(FW_weighted_neutrals, output_path = "data/FW_empirical_kingman.rds")
 ```
