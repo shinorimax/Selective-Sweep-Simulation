@@ -134,6 +134,78 @@ ggplot(roc_df, aes(x = fpr, y = tpr)) +
   )
 ```
 
+### Export results for all scenarios
+
+```{r}
+# --- Helpers ------------------------------------------------------------------
+dist_d1 <- function(F1, F2) sum(abs(F1 - F2))
+
+# format numbers like 0.02, 0.5, 0.003 (no trailing zeros like 0.50)
+fmt <- function(x) {
+  out <- format(x, trim = TRUE, scientific = FALSE)
+  out <- sub("0+$", "", sub("\\.$", "", out))
+  out
+}
+
+# --- Load once ----------------------------------------------------------------
+F_weighted_neutrals <- readRDS("data/FW_weighted_average_neutrals.rds")
+F_mean_neutral      <- readRDS("data/FW_empirical_kingman.rds")
+
+# neutral test half (same for all scenarios)
+n_total   <- length(F_weighted_neutrals)
+half_idx  <- floor(n_total / 2) + 1L
+# F_neu_test <- F_weighted_neutrals[half_idx:n_total]
+F_neu_test <- F_weighted_neutrals[1:n_total]
+
+d_neutral_test <- vapply(
+  F_neu_test,
+  function(F) dist_d1(F, F_mean_neutral),
+  numeric(1)
+)
+
+# --- Output directory (relative to Analysis/phylodyn/*) -----------------------
+roc_dir <- file.path("..", "..", "SliM", "roc")   # ../../SliM/roc
+dir.create(roc_dir, showWarnings = FALSE, recursive = TRUE)
+
+# --- Scenario grid -------------------------------------------------------------
+s_vals <- c(0.02, 0.01, 0.003, 0.001)
+f_vals <- c(0.25, 0.5, 0.75)
+
+for (s in s_vals) for (F in f_vals) {
+  s_str <- fmt(s); f_str <- fmt(F)
+  scenario_tag <- paste0("s=", s_str, "F=", f_str)
+
+  # corresponding .rds produced by your compute_weighted_Fs() runs
+  sel_rds <- file.path(
+    "data",
+    sprintf("FW_weighted_average_selectives_s%s_f%s.rds", s_str, f_str)
+  )
+
+  if (!file.exists(sel_rds)) {
+    message("Skipping ", scenario_tag, " (missing file: ", sel_rds, ")")
+    next
+  }
+
+  F_weighted_selective <- readRDS(sel_rds)
+
+  d_selective <- vapply(
+    F_weighted_selective,
+    function(Fmat) dist_d1(Fmat, F_mean_neutral),
+    numeric(1)
+  )
+
+  scores_df <- data.frame(
+    label = c(rep(0L, length(d_neutral_test)), rep(1L, length(d_selective))), # 0=Neutral, 1=Selective
+    score = c(d_neutral_test, d_selective) # larger => more selective
+  )
+
+  out_csv <- file.path(roc_dir, sprintf("D1FW_scores_%s.csv", scenario_tag))
+  write.csv(scores_df, out_csv, row.names = FALSE)
+  message("Wrote: ", out_csv, "  (n0=", length(d_neutral_test),
+          ", n1=", length(d_selective), ")")
+}
+```
+
 ## Calculate and store d2-distance to Kingman
 
 ```{r}

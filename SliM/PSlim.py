@@ -12,6 +12,11 @@ try:
 except Exception:
     _HAVE_SKLEARN = False
 
+import sys
+# add the parent of the *inner* bim/ to sys.path
+sys.path.insert(0, "/opt/anaconda3/envs/sweep312/bin/bim")
+from bim.utils import InferEta
+
 # ---- optional: demography inference helper (only if you actually train eta) ----
 # If you won't use train_eta(), you can ignore this import and leave it commented.
 # sys.path.append('/home/enes/bim/')

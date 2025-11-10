@@ -33,9 +33,32 @@ SliM/slimfiles/
 SliM/etas/
 SliM/sim.vcz
 SliM/tsinfer_test
+SliM/roc/
 
 ## Exclude data storage in Analysis/phylodyn
 Analysis/phylodyn/data/
 Analysis/phylodyn/.RdataTmp
+Analysis/phylodyn/ARGWeaver_exploratory_analysis.Rmd
+Analysis/phylodyn/AUC_ROC_kingman.Rmd
+Analysis/phylodyn/AUC_ROC_neighboring.Rmd
+Analysis/phylodyn/chromosome_analysis.Rmd
+Analysis/phylodyn/demo.Rmd
+Analysis/phylodyn/dist_based_test.R
+Analysis/phylodyn/first_test_heterochronous_15_4pm.R
+Analysis/phylodyn/giant_MDS.Rmd
+Analysis/phylodyn/HMM_Modeling.Rmd
+Analysis/phylodyn/HMM_test.Rmd
+Analysis/phylodyn/hotelling.R
+Analysis/phylodyn/Hotellings_t_test.Rmd
+Analysis/phylodyn/load_and_store_data_utils.R
+Analysis/phylodyn/load_and_store_data.Rmd
+Analysis/phylodyn/phylodyn_example.Rmd
+Analysis/phylodyn/phylodyn_rework.Rmd
+Analysis/phylodyn/phylodyn.Rproj
+Analysis/phylodyn/pMaxBB.R
+Analysis/phylodyn/two_sample_test_rework.Rmd
+Analysis/phylodyn/two_sample_test.Rmd
+Analysis/phylodyn/Untitled.R
+Analysis/phylodyn/utils.R
 
 README.md
