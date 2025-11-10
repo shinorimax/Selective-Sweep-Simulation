@@ -31,7 +31,7 @@ library(fmatrix)
 library(phylodyn)
 ```
 
-## Calculate and store d-1 distance to Kingman
+## Calculate and store d-1 distance to empirical Kingman
 
 ```{r}
 F_weighted_neutrals <- readRDS("data/F_weighted_average_neutrals.rds")
@@ -74,7 +74,7 @@ df_dist <- data.frame(
 )
 ```
 
-## Plot distribution
+### Plot distribution
 
 ```{r}
 # Plot densities
@@ -134,6 +134,89 @@ ggplot(roc_df, aes(x = fpr, y = tpr)) +
   )
 ```
 
+## Use the distance to theoritical mean
+
+```{r}
+F_kingman <- kingman_m(n=50)
+```
+
+```{r}
+# --- 4. Compute distances to empirical mean ----------------------------------
+d_neutral_test <- vapply(
+  F_weighted_list_neutral_test,
+  function(F) dist_d1(F, F_kingman),
+  numeric(1)
+)
+
+d_selective <- vapply(
+  F_weighted_list_selective,
+  function(F) dist_d1(F, F_kingman),
+  numeric(1)
+)
+
+# --- 5. Combine into one data frame ------------------------------------------
+df_dist <- data.frame(
+  distance = c(d_neutral_test, d_selective),
+  scenario = rep(c("Neutral", "Selective"),
+                 c(length(d_neutral_test), length(d_selective)))
+)
+```
+
+### Plot distribution
+
+```{r}
+# Plot densities
+ggplot(df_dist, aes(x = distance, fill = scenario)) +
+  geom_density(alpha = 0.4, adjust = 1.2) +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "Distribution of d1 Distances to Theoritical mean under Kingman F-matrix",
+    x = expression(paste("Distance (", d[1], ")")),
+    y = "Density"
+  ) +
+  scale_fill_manual(values = c("#1b9e77", "#d95f02"))
+```
+
+```{r}
+# --- 1. Prepare labels and scores --------------------------------------------
+# "Neutral" = 0 class, "Selective" = 1 class
+labels <- c(rep("Neutral",   length(d_neutral_test)),
+            rep("Selective", length(d_selective)))
+scores <- c(d_neutral_test, d_selective)   # larger distance => more likely Selective
+
+# --- 2. Compute ROC curve and AUC -------------------------------------------
+# direction = "<" means: smaller scores → Neutral, larger → Selective
+roc_obj <- roc(response = labels,
+               predictor = scores,
+               levels = c("Neutral", "Selective"),
+               direction = "<")
+
+auc_val <- as.numeric(auc(roc_obj))
+# cat(sprintf("AUC = %.3f\n", auc_val))
+
+# --- 3. Build a tidy ROC data frame ------------------------------------------
+roc_df <- data.frame(
+  fpr = 1 - roc_obj$specificities,
+  tpr = roc_obj$sensitivities
+)
+
+# --- 4. Plot with ggplot2 ----------------------------------------------------
+ggplot(roc_df, aes(x = fpr, y = tpr)) +
+  geom_path(linewidth = 1.2, color = "#d95f02") +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "gray50") +
+  coord_equal() +
+  labs(
+    title = sprintf("ROC Curve (AUC = %.3f)", auc_val),
+    x = "False Positive Rate (1 - specificity)",
+    y = "True Positive Rate (sensitivity)"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+```
+
 ## Calculate and store d2-distance to Kingman
 
 ```{r}
@@ -177,7 +260,91 @@ df_dist <- data.frame(
 )
 ```
 
-## Plot distribution
+### Plot distribution
+
+```{r}
+# Plot densities
+ggplot(df_dist, aes(x = distance, fill = scenario)) +
+  geom_density(alpha = 0.4, adjust = 1.2) +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "Distribution of d2 Distances to Neutral Mean F-matrix",
+    x = expression(paste("Distance (", d[1], ")")),
+    y = "Density"
+  ) +
+  scale_fill_manual(values = c("#1b9e77", "#d95f02"))
+```
+
+```{r}
+# --- 1. Prepare labels and scores --------------------------------------------
+# "Neutral" = 0 class, "Selective" = 1 class
+labels <- c(rep("Neutral",   length(d_neutral_test)),
+            rep("Selective", length(d_selective)))
+scores <- c(d_neutral_test, d_selective)   # larger distance => more likely Selective
+
+# --- 2. Compute ROC curve and AUC -------------------------------------------
+if (!requireNamespace("pROC", quietly = TRUE)) install.packages("pROC")
+library(pROC)
+
+# direction = "<" means: smaller scores → Neutral, larger → Selective
+roc_obj <- roc(response = labels,
+               predictor = scores,
+               levels = c("Neutral", "Selective"),
+               direction = "<")
+
+auc_val <- as.numeric(auc(roc_obj))
+# cat(sprintf("AUC = %.3f\n", auc_val))
+
+# --- 3. Build a tidy ROC data frame ------------------------------------------
+roc_df <- data.frame(
+  fpr = 1 - roc_obj$specificities,
+  tpr = roc_obj$sensitivities
+)
+
+# --- 4. Plot with ggplot2 ----------------------------------------------------
+library(ggplot2)
+
+ggplot(roc_df, aes(x = fpr, y = tpr)) +
+  geom_path(linewidth = 1.2, color = "#d95f02") +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "gray50") +
+  coord_equal() +
+  labs(
+    title = sprintf("ROC Curve (AUC = %.3f)", auc_val),
+    x = "False Positive Rate (1 - specificity)",
+    y = "True Positive Rate (sensitivity)"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+```
+
+## Use the distance to theoretical mean
+
+```{r}
+# --- 4. Compute distances to empirical mean (L2) ------------------------------
+d_neutral_test <- vapply(
+  F_weighted_list_neutral_test,
+  function(F) dist_d2(F, F_kingman),
+  numeric(1)
+)
+
+d_selective <- vapply(
+  F_weighted_list_selective,
+  function(F) dist_d2(F, F_kingman),
+  numeric(1)
+)
+
+# --- 5. Combine into one data frame ------------------------------------------
+df_dist <- data.frame(
+  distance = c(d_neutral_test, d_selective),
+  scenario = rep(c("Neutral", "Selective"),
+                 c(length(d_neutral_test), length(d_selective)))
+)
+```
+
+### Plot distribution
 
 ```{r}
 # Plot densities

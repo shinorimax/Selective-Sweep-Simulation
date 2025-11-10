@@ -36,5 +36,6 @@ SliM/tsinfer_test
 
 ## Exclude data storage in Analysis/phylodyn
 Analysis/phylodyn/data/
+Analysis/phylodyn/.RdataTmp
 
 README.md
