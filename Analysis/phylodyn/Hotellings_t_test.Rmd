@@ -68,6 +68,47 @@ cat("p =", p, " | n_x + n_y - 2 =", nxy - 2, "\n")
 myHotelling(X_neu, Y_sel)  # TRUE if p<0.05, FALSE if not, NA if singular/error
 ```
 
+```{r}
+library(ICSNP)
+
+hotelling_score <- function(X, Y) {
+  # X: neutral F-vectors for this replicate
+  # Y: selective F-vectors for same replicate
+
+  out <- ICSNP::HotellingsT2(X, Y)
+  # return either T² or -log10(p)
+  return(-log10(out$p.value))
+}
+
+scores <- c()
+labels <- c()   # "Neutral" or "Selective"
+
+for (r in seq_along(rep_list)) {
+
+    X_neu_r <- do.call(rbind, lapply(neutral_list[[r]], vecF))
+    Y_sel_r <- do.call(rbind, lapply(selective_list[[r]], vecF))
+
+    score_r <- hotelling_score(X_neu_r, Y_sel_r)
+
+    # label replicates under neutral simulation as "Neutral"
+    labels <- c(labels, "Neutral")
+    scores <- c(scores, score_r)
+}
+
+labels <- c(rep("Neutral", n_neu_rep),
+            rep("Selective", n_sel_rep))
+
+roc_obj <- roc(
+  response = labels,
+  predictor = scores,
+  levels = c("Neutral","Selective"),
+  direction = "<"
+)
+
+plot(roc_obj)
+auc(roc_obj)
+```
+
 ## Load F-matrices
 
 ```{r}
@@ -190,7 +231,7 @@ Y_sel    <- flatten_to_matrix_pb(sel_thin, label = "Flattening selectives")
 # Quick feasibility check and run your test
 p   <- ncol(X_neu); nxy <- nrow(X_neu) + nrow(Y_sel)
 cat("p =", p, "| n_x + n_y - 2 =", nxy - 2, "\n")
-myHotelling(X_neu, Y_sel)   # TRUE if p < 0.05, FALSE otherwise, NA if singular
+# myHotelling(X_neu, Y_sel)   # TRUE if p < 0.05, FALSE otherwise, NA if singular
 ```
 
 ```{r}

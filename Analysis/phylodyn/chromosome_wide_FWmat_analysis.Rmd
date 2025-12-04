@@ -34,8 +34,8 @@ library(phylodyn)
 ## Calculate and store d-1 distance to Kingman
 
 ```{r}
-FW_weighted_neutrals <- readRDS("data/FW_weighted_average_neutrals.rds")
-FW_weighted_selectives_s0.01_f0.75 <- readRDS("data/FW_weighted_average_selectives_s0.01_f0.75.rds")
+FW_weighted_neutrals <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/FW_weighted_average_neutrals.rds")
+FW_weighted_selectives_s0.01_f0.75 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/FW_weighted_average_selectives_s0.01_f0.75.rds")
 
 # --- Helper function for L1 distance (unweighted) ----
 dist_d1 <- function(F1, F2) {
@@ -148,8 +148,11 @@ fmt <- function(x) {
 }
 
 # --- Load once ----------------------------------------------------------------
-F_weighted_neutrals <- readRDS("data/FW_weighted_average_neutrals.rds")
-F_mean_neutral      <- readRDS("data/FW_empirical_kingman.rds")
+# F_weighted_neutrals <- readRDS("data/FW_weighted_average_neutrals.rds")
+# F_mean_neutral      <- readRDS("data/FW_empirical_kingman.rds")
+
+F_weighted_neutrals <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/FW_weighted_average_neutrals.rds")
+F_mean_neutral      <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/FW_empirical_kingman.rds")
 
 # neutral test half (same for all scenarios)
 n_total   <- length(F_weighted_neutrals)
@@ -164,7 +167,8 @@ d_neutral_test <- vapply(
 )
 
 # --- Output directory (relative to Analysis/phylodyn/*) -----------------------
-roc_dir <- file.path("..", "..", "SliM", "roc")   # ../../SliM/roc
+# roc_dir <- file.path("..", "..", "SliM", "roc")   # ../../SliM/roc
+roc_dir <- "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/roc" 
 dir.create(roc_dir, showWarnings = FALSE, recursive = TRUE)
 
 # --- Scenario grid -------------------------------------------------------------
@@ -307,4 +311,308 @@ ggplot(roc_df, aes(x = fpr, y = tpr)) +
     plot.title = element_text(hjust = 0.5, face = "bold"),
     panel.grid.minor = element_blank()
   )
+```
+
+## Use d-0 distance (raw values)
+
+## Calculate and store d-1 distance to Kingman
+
+```{r}
+FW_weighted_neutrals <- readRDS("data/FW_weighted_average_neutrals.rds")
+FW_weighted_selectives_s0.01_f0.75 <- readRDS("data/FW_weighted_average_selectives_s0.01_f0.75.rds")
+
+# --- Helper function for L1 distance (unweighted) ----
+dist_d0 <- function(F1, F2) {
+  sum(F1 - F2)
+}
+
+# --- 1. Split the neutral list: use the second half for testing ---------------
+n_total <- length(FW_weighted_neutrals)
+half_idx <- floor(n_total / 2) + 1
+FW_weighted_list_neutral_test <- FW_weighted_neutrals[half_idx:n_total]
+
+# --- 2. Load or reference the selective set ----------------------------------
+FW_weighted_list_selective <- FW_weighted_selectives_s0.01_f0.75
+
+# --- 3. Load or reference the empirical mean F-matrix ------------------------
+FW_mean_neutral <- readRDS("data/FW_empirical_kingman.rds")
+
+# --- 4. Compute distances to empirical mean ----------------------------------
+d_neutral_test <- vapply(
+  FW_weighted_list_neutral_test,
+  function(F) dist_d0(F, FW_mean_neutral),
+  numeric(1)
+)
+
+d_selective <- vapply(
+  FW_weighted_list_selective,
+  function(F) dist_d0(F, FW_mean_neutral),
+  numeric(1)
+)
+
+# --- 5. Combine into one data frame ------------------------------------------
+df_dist <- data.frame(
+  distance = c(d_neutral_test, d_selective),
+  scenario = rep(c("Neutral", "Selective"),
+                 c(length(d_neutral_test), length(d_selective)))
+)
+```
+
+## Plot distribution
+
+```{r}
+# Plot densities
+ggplot(df_dist, aes(x = distance, fill = scenario)) +
+  geom_density(alpha = 0.4, adjust = 1.2) +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "Distribution of d1 Weigted Distances to Neutral Mean F-matrix",
+    x = expression(paste("Distance (", d[1], ")")),
+    y = "Density"
+  ) +
+  scale_fill_manual(values = c("#1b9e77", "#d95f02"))
+```
+
+```{r}
+# --- 1. Prepare labels and scores --------------------------------------------
+# "Neutral" = 0 class, "Selective" = 1 class
+labels <- c(rep("Neutral",   length(d_neutral_test)),
+            rep("Selective", length(d_selective)))
+scores <- c(d_neutral_test, d_selective)   # larger distance => more likely Selective
+
+# --- 2. Compute ROC curve and AUC -------------------------------------------
+if (!requireNamespace("pROC", quietly = TRUE)) install.packages("pROC")
+library(pROC)
+
+# direction = "<" means: smaller scores → Neutral, larger → Selective
+roc_obj <- roc(response = labels,
+               predictor = scores,
+               levels = c("Neutral", "Selective"),
+               direction = ">")
+
+auc_val <- as.numeric(auc(roc_obj))
+# cat(sprintf("AUC = %.3f\n", auc_val))
+
+# --- 3. Build a tidy ROC data frame ------------------------------------------
+roc_df <- data.frame(
+  fpr = 1 - roc_obj$specificities,
+  tpr = roc_obj$sensitivities
+)
+
+# --- 4. Plot with ggplot2 ----------------------------------------------------
+library(ggplot2)
+
+ggplot(roc_df, aes(x = fpr, y = tpr)) +
+  geom_path(linewidth = 1.2, color = "#d95f02") +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "gray50") +
+  coord_equal() +
+  labs(
+    title = sprintf("ROC Curve (AUC = %.3f)", auc_val),
+    x = "False Positive Rate (1 - specificity)",
+    y = "True Positive Rate (sensitivity)"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    panel.grid.minor = element_blank()
+  )
+```
+
+### Export results for all scenarios
+
+```{r}
+# format numbers like 0.02, 0.5, 0.003 (no trailing zeros like 0.50)
+fmt <- function(x) {
+  out <- format(x, trim = TRUE, scientific = FALSE)
+  out <- sub("0+$", "", sub("\\.$", "", out))
+  out
+}
+
+# --- Load once ----------------------------------------------------------------
+F_weighted_neutrals <- readRDS("data/F_weighted_average_neutrals.rds")
+F_mean_neutral      <- readRDS("data/F_empirical_kingman.rds")
+
+# neutral test half (same for all scenarios)
+n_total   <- length(F_weighted_neutrals)
+half_idx  <- floor(n_total / 2) + 1L
+F_neu_test <- F_weighted_neutrals[half_idx:n_total]
+# F_neu_test <- F_weighted_neutrals[1:n_total]
+
+d_neutral_test <- vapply(
+  F_neu_test,
+  function(F) dist_d0(F, F_mean_neutral),
+  numeric(1)
+)
+
+# --- Output directory (relative to Analysis/phylodyn/*) -----------------------
+roc_dir <- file.path("..", "..", "SliM", "roc")   # ../../SliM/roc
+dir.create(roc_dir, showWarnings = FALSE, recursive = TRUE)
+
+# --- Scenario grid -------------------------------------------------------------
+s_vals <- c(0.02, 0.01, 0.003, 0.001)
+f_vals <- c(0.25, 0.5, 0.75)
+
+for (s in s_vals) for (F in f_vals) {
+  s_str <- fmt(s); f_str <- fmt(F)
+  scenario_tag <- paste0("s=", s_str, "F=", f_str)
+
+  # corresponding .rds produced by your compute_weighted_Fs() runs
+  sel_rds <- file.path(
+    "data",
+    sprintf("F_weighted_average_selectives_s%s_f%s.rds", s_str, f_str)
+  )
+
+  if (!file.exists(sel_rds)) {
+    message("Skipping ", scenario_tag, " (missing file: ", sel_rds, ")")
+    next
+  }
+
+  F_weighted_selective <- readRDS(sel_rds)
+
+  d_selective <- vapply(
+    F_weighted_selective,
+    function(Fmat) dist_d0(Fmat, F_mean_neutral),
+    numeric(1)
+  )
+
+  scores_df <- data.frame(
+    label = c(rep(0L, length(d_neutral_test)), rep(1L, length(d_selective))), # 0=Neutral, 1=Selective
+    score = c(d_neutral_test, d_selective) # larger => more selective
+  )
+
+  out_csv <- file.path(roc_dir, sprintf("D0FW_scores_%s.csv", scenario_tag))
+  write.csv(scores_df, out_csv, row.names = FALSE)
+  message("Wrote: ", out_csv, "  (n0=", length(d_neutral_test),
+          ", n1=", length(d_selective), ")")
+}
+```
+
+## Calculate and store d-1 weighted distance to Kingman
+
+```{r}
+FW_weighted_neutrals <- readRDS("data/FW_weighted_average_around_positive_mutation_neutrals.rds")
+FW_weighted_selectives_s0.01_f0.75 <- readRDS("data/FW_weighted_average_around_positive_mutation_selectives_s0.01_f0.75.rds")
+
+# --- Helper function for L1 distance (unweighted) ----
+dist_d1 <- function(F1, F2) {
+  sum(abs(F1 - F2))
+}
+
+# --- 1. Split the neutral list: use the second half for testing ---------------
+n_total <- length(FW_weighted_neutrals)
+half_idx <- floor(n_total / 2) + 1
+FW_weighted_list_neutral_test <- FW_weighted_neutrals[half_idx:n_total]
+
+# --- 2. Load or reference the selective set ----------------------------------
+FW_weighted_list_selective <- FW_weighted_selectives_s0.01_f0.75
+
+# --- 3. Load or reference the empirical mean F-matrix ------------------------
+FW_mean_neutral <- readRDS("data/FW_empirical_kingman_around_positive_mutation.rds")
+
+# --- 4. Compute distances to empirical mean ----------------------------------
+d_neutral_test <- vapply(
+  FW_weighted_list_neutral_test,
+  function(F) dist_d1(F, FW_mean_neutral),
+  numeric(1)
+)
+
+d_selective <- vapply(
+  FW_weighted_list_selective,
+  function(F) dist_d1(F, FW_mean_neutral),
+  numeric(1)
+)
+
+# --- 5. Combine into one data frame ------------------------------------------
+df_dist <- data.frame(
+  distance = c(d_neutral_test, d_selective),
+  scenario = rep(c("Neutral", "Selective"),
+                 c(length(d_neutral_test), length(d_selective)))
+)
+```
+
+## Plot distribution
+
+```{r}
+# Plot densities
+ggplot(df_dist, aes(x = distance, fill = scenario)) +
+  geom_density(alpha = 0.4, adjust = 1.2) +
+  theme_minimal(base_size = 14) +
+  labs(
+    title = "Distribution of d1 Weigted Distances to Neutral Mean F-matrix",
+    x = expression(paste("Distance (", d[1], ")")),
+    y = "Density"
+  ) +
+  scale_fill_manual(values = c("#1b9e77", "#d95f02"))
+```
+
+### Export results for all scenarios
+
+```{r}
+# --- Helpers ------------------------------------------------------------------
+dist_d1 <- function(F1, F2) sum(abs(F1 - F2))
+
+# format numbers like 0.02, 0.5, 0.003 (no trailing zeros like 0.50)
+fmt <- function(x) {
+  out <- format(x, trim = TRUE, scientific = FALSE)
+  out <- sub("0+$", "", sub("\\.$", "", out))
+  out
+}
+
+# --- Load once ----------------------------------------------------------------
+F_weighted_neutrals <- readRDS("data/FW_weighted_average_around_positive_mutation_neutrals.rds")
+F_mean_neutral      <- readRDS("data/FW_empirical_kingman_around_positive_mutation.rds")
+
+# neutral test half (same for all scenarios)
+n_total   <- length(F_weighted_neutrals)
+half_idx  <- floor(n_total / 2) + 1L
+F_neu_test <- F_weighted_neutrals[half_idx:n_total]
+# F_neu_test <- F_weighted_neutrals[1:n_total]
+
+d_neutral_test <- vapply(
+  F_neu_test,
+  function(F) dist_d1(F, F_mean_neutral),
+  numeric(1)
+)
+
+# --- Output directory (relative to Analysis/phylodyn/*) -----------------------
+roc_dir <- file.path("..", "..", "SliM", "roc")   # ../../SliM/roc
+dir.create(roc_dir, showWarnings = FALSE, recursive = TRUE)
+
+# --- Scenario grid -------------------------------------------------------------
+s_vals <- c(0.02, 0.01, 0.003, 0.001)
+f_vals <- c(0.25, 0.5, 0.75)
+
+for (s in s_vals) for (F in f_vals) {
+  s_str <- fmt(s); f_str <- fmt(F)
+  scenario_tag <- paste0("s=", s_str, "F=", f_str)
+
+  # corresponding .rds produced by your compute_weighted_Fs() runs
+  sel_rds <- file.path(
+    "data",
+    sprintf("FW_weighted_average_around_positive_mutation_selectives_s%s_f%s.rds", s_str, f_str)
+  )
+
+  if (!file.exists(sel_rds)) {
+    message("Skipping ", scenario_tag, " (missing file: ", sel_rds, ")")
+    next
+  }
+
+  F_weighted_selective <- readRDS(sel_rds)
+
+  d_selective <- vapply(
+    F_weighted_selective,
+    function(Fmat) dist_d1(Fmat, F_mean_neutral),
+    numeric(1)
+  )
+
+  scores_df <- data.frame(
+    label = c(rep(0L, length(d_neutral_test)), rep(1L, length(d_selective))), # 0=Neutral, 1=Selective
+    score = c(d_neutral_test, d_selective) # larger => more selective
+  )
+
+  out_csv <- file.path(roc_dir, sprintf("D1FWS_scores_%s.csv", scenario_tag))
+  write.csv(scores_df, out_csv, row.names = FALSE)
+  message("Wrote: ", out_csv, "  (n0=", length(d_neutral_test),
+          ", n1=", length(d_selective), ")")
+}
 ```
