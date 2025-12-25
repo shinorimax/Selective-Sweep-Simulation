@@ -24,41 +24,31 @@ __pycache__/
 ## Exclude Conda Environment
 sweep312/
 
+## Exclude draft files in Simulation folder
+
+
 ## Exclude Slim Result Files
-SliM/trees/
-SliM/trees_newick/
-SliM/outs/
-SliM/checkpoints/
-SliM/slimfiles/
-SliM/etas/
-SliM/sim.vcz
-SliM/tsinfer_test
-SliM/roc/
+Simulation/Slim(primary)/trees/
+Simulation/Slim(primary)/trees_newick/
+Simulation/Slim(primary)/outs/
+Simulation/Slim(primary)/checkpoints/
+Simulation/Slim(primary)/slimfiles/
+Simulation/Slim(primary)/etas/
+Simulation/Slim(primary)/sim.vcz
+Simulation/Slim(primary)/tsinfer_test
+Simulation/Slim(primary)/roc/
+Simulation/Slim(primary)/Calculation---Constant_Directional_Selection.ipynb
+Simulation/Slim(primary)/tsinfer.ipynb
 
-## Exclude data storage in Analysis/phylodyn
+# Exclude msprime result files (except run.py)
+Simulation/msprime(secondary)/*
+!Simulation/msprime(secondary)/run.py
+
+
+## Exclude data storage in Analysis/phylodyn (except load_and_store_data.Rmd)
+Analysis/phylodyn/*
+!Analysis/phylodyn/load_and_store_data.Rmd
 Analysis/phylodyn/data/
-Analysis/phylodyn/.RdataTmp
-Analysis/phylodyn/ARGWeaver_exploratory_analysis.Rmd
-Analysis/phylodyn/AUC_ROC_kingman.Rmd
-Analysis/phylodyn/AUC_ROC_neighboring.Rmd
-Analysis/phylodyn/chromosome_analysis.Rmd
-Analysis/phylodyn/demo.Rmd
-Analysis/phylodyn/dist_based_test.R
-Analysis/phylodyn/first_test_heterochronous_15_4pm.R
-Analysis/phylodyn/giant_MDS.Rmd
-Analysis/phylodyn/HMM_Modeling.Rmd
-Analysis/phylodyn/HMM_test.Rmd
-Analysis/phylodyn/hotelling.R
-Analysis/phylodyn/Hotellings_t_test.Rmd
-Analysis/phylodyn/load_and_store_data_utils.R
-Analysis/phylodyn/load_and_store_data.Rmd
-Analysis/phylodyn/phylodyn_example.Rmd
-Analysis/phylodyn/phylodyn_rework.Rmd
-Analysis/phylodyn/phylodyn.Rproj
-Analysis/phylodyn/pMaxBB.R
-Analysis/phylodyn/two_sample_test_rework.Rmd
-Analysis/phylodyn/two_sample_test.Rmd
-Analysis/phylodyn/Untitled.R
-Analysis/phylodyn/utils.R
 
-README.md
+Analysis/phylodyn.Rmd
+Analysis/phylodyn.nb.html

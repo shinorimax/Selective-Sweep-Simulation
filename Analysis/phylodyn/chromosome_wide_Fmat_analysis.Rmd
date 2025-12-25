@@ -150,7 +150,8 @@ scores_df <- data.frame(
   score = c(d_neutral_test, d_selective)  # larger => more selective
 )
 
-roc_dir <- file.path("..", "..", "SliM", "roc")  # ../../SliM/roc
+# roc_dir <- file.path("..", "..", "SliM", "roc")  # ../../SliM/roc
+roc_dir <- "../roc" 
 dir.create(roc_dir, showWarnings = FALSE, recursive = TRUE)
 out_csv <- file.path(roc_dir, sprintf("D1F_scores_%s.csv", scenario_tag))
 write.csv(scores_df, out_csv, row.names = FALSE)
@@ -191,7 +192,7 @@ d_neutral_test <- vapply(
 
 # --- Output directory (relative to Analysis/phylodyn/*) -----------------------
 # roc_dir <- file.path("..", "..", "SliM", "roc")   # ../../SliM/roc
-roc_dir <- "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/roc" 
+roc_dir <- "../roc" 
 dir.create(roc_dir, showWarnings = FALSE, recursive = TRUE)
 
 # --- Scenario grid -------------------------------------------------------------
@@ -446,7 +447,8 @@ d_neutral_test <- vapply(
 )
 
 # --- Output directory (relative to Analysis/phylodyn/*) -----------------------
-roc_dir <- file.path("..", "..", "SliM", "roc")   # ../../SliM/roc
+# roc_dir <- file.path("..", "..", "SliM", "roc")   # ../../SliM/roc
+roc_dir <- "../roc"
 dir.create(roc_dir, showWarnings = FALSE, recursive = TRUE)
 
 # --- Scenario grid -------------------------------------------------------------
@@ -703,7 +705,7 @@ d_neutral_test <- vapply(
 )
 
 # --- Output directory (relative to Analysis/phylodyn/*) -----------------------
-roc_dir <- file.path("..", "..", "SliM", "roc")   # ../../SliM/roc
+# roc_dir <- file.path("..", "..", "SliM", "roc")   # ../../SliM/roc
 dir.create(roc_dir, showWarnings = FALSE, recursive = TRUE)
 
 # --- Scenario grid -------------------------------------------------------------
@@ -881,7 +883,8 @@ d_neutral_test <- vapply(
 )
 
 # --- Output directory (relative to Analysis/phylodyn/*) -----------------------
-roc_dir <- file.path("..", "..", "SliM", "roc")   # ../../SliM/roc
+# roc_dir <- file.path("..", "..", "SliM", "roc")   # ../../SliM/roc
+roc_dir <- "../roc" 
 dir.create(roc_dir, showWarnings = FALSE, recursive = TRUE)
 
 # --- Scenario grid -------------------------------------------------------------

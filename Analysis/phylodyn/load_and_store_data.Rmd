@@ -35,9 +35,9 @@ source("load_and_store_data_utils.R")
 # --- Ensure data directory exists ------------------------------------------
 if (!dir.exists("data")) dir.create("data")
 
+data_dir <- "../../Simulation/Slim(primary)/trees_newick/"
 # data_dir <- "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/Selective-Sweep-Simulation/SliM/trees_newick"
-
-data_dir <- "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/trees_newick"
+# data_dir <- "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/trees_newick"
 ```
 
 ## Load Trees
@@ -69,8 +69,8 @@ read_and_save <- function(pattern_name, prefix) {
   #   saveRDS(obj, file = file.path("data", paste0(pattern_name, ".rds")))
   # cat("  Saved ->", file.path("data", paste0(pattern_name, ".rds")), "\n\n")
   
-    saveRDS(obj, file = file.path("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data", paste0(pattern_name, ".rds")))
-  cat("  Saved ->", file.path("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data", paste0(pattern_name, ".rds")), "\n\n")
+    saveRDS(obj, file = file.path("data", paste0(pattern_name, ".rds")))
+  cat("  Saved ->", file.path("data", paste0(pattern_name, ".rds")), "\n\n")
   
   return(obj)
 }
@@ -108,22 +108,22 @@ Fs is a large list of all f-matrices.
 
 ```{r}
 # --- Example -----------------------------------------------------------------
-Fs_neutrals <- compute_and_save_Fs_nested(neutrals, "neutrals", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
-Fs_s0.02_f0.25 <- compute_and_save_Fs_nested(selectives_s0.02_f0.25, "selectives_s0.02_f0.25", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
-Fs_s0.02_f0.5  <- compute_and_save_Fs_nested(selectives_s0.02_f0.5,  "selectives_s0.02_f0.5", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
-Fs_s0.02_f0.75 <- compute_and_save_Fs_nested(selectives_s0.02_f0.75, "selectives_s0.02_f0.75", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
+Fs_neutrals <- compute_and_save_Fs_nested(neutrals, "neutrals", out_dir = "data")
+Fs_s0.02_f0.25 <- compute_and_save_Fs_nested(selectives_s0.02_f0.25, "selectives_s0.02_f0.25", out_dir = "data")
+Fs_s0.02_f0.5  <- compute_and_save_Fs_nested(selectives_s0.02_f0.5,  "selectives_s0.02_f0.5", out_dir = "data")
+Fs_s0.02_f0.75 <- compute_and_save_Fs_nested(selectives_s0.02_f0.75, "selectives_s0.02_f0.75", out_dir = "data")
 
-Fs_s0.01_f0.25 <- compute_and_save_Fs_nested(selectives_s0.01_f0.25, "selectives_s0.01_f0.25", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
-Fs_s0.01_f0.5  <- compute_and_save_Fs_nested(selectives_s0.01_f0.5,  "selectives_s0.01_f0.5", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
-Fs_s0.01_f0.75 <- compute_and_save_Fs_nested(selectives_s0.01_f0.75, "selectives_s0.01_f0.75", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
+Fs_s0.01_f0.25 <- compute_and_save_Fs_nested(selectives_s0.01_f0.25, "selectives_s0.01_f0.25", out_dir = "data")
+Fs_s0.01_f0.5  <- compute_and_save_Fs_nested(selectives_s0.01_f0.5,  "selectives_s0.01_f0.5", out_dir = "data")
+Fs_s0.01_f0.75 <- compute_and_save_Fs_nested(selectives_s0.01_f0.75, "selectives_s0.01_f0.75", out_dir = "data")
 
-Fs_s0.003_f0.25 <- compute_and_save_Fs_nested(selectives_s0.003_f0.25, "selectives_s0.003_f0.25", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
-Fs_s0.003_f0.5  <- compute_and_save_Fs_nested(selectives_s0.003_f0.5,  "selectives_s0.003_f0.5", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
-Fs_s0.003_f0.75 <- compute_and_save_Fs_nested(selectives_s0.003_f0.75, "selectives_s0.003_f0.75", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
+Fs_s0.003_f0.25 <- compute_and_save_Fs_nested(selectives_s0.003_f0.25, "selectives_s0.003_f0.25", out_dir = "data")
+Fs_s0.003_f0.5  <- compute_and_save_Fs_nested(selectives_s0.003_f0.5,  "selectives_s0.003_f0.5", out_dir = "data")
+Fs_s0.003_f0.75 <- compute_and_save_Fs_nested(selectives_s0.003_f0.75, "selectives_s0.003_f0.75", out_dir = "data")
 
-Fs_s0.001_f0.25 <- compute_and_save_Fs_nested(selectives_s0.001_f0.25, "selectives_s0.001_f0.25", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
-Fs_s0.001_f0.5  <- compute_and_save_Fs_nested(selectives_s0.001_f0.5,  "selectives_s0.001_f0.5", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
-Fs_s0.001_f0.75 <- compute_and_save_Fs_nested(selectives_s0.001_f0.75, "selectives_s0.001_f0.75", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
+Fs_s0.001_f0.25 <- compute_and_save_Fs_nested(selectives_s0.001_f0.25, "selectives_s0.001_f0.25", out_dir = "data")
+Fs_s0.001_f0.5  <- compute_and_save_Fs_nested(selectives_s0.001_f0.5,  "selectives_s0.001_f0.5", out_dir = "data")
+Fs_s0.001_f0.75 <- compute_and_save_Fs_nested(selectives_s0.001_f0.75, "selectives_s0.001_f0.75", out_dir = "data")
 # Now:
 #   Fs_neutrals[[1]][[1]]  # first tree on the first chromosome
 ```
@@ -134,54 +134,54 @@ Fs_s0.001_f0.75 <- compute_and_save_Fs_nested(selectives_s0.001_f0.75, "selectiv
 # --- Load and compute weighted F matrices for all conditions -----------------
 
 # Neutral
-Fs_nested_neutrals <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/Fs_nested_neutrals.rds")
+Fs_nested_neutrals <- readRDS("data/Fs_nested_neutrals.rds")
 F_weighted_neutrals <- compute_weighted_Fs(
   Fs_nested = Fs_nested_neutrals,
   breaks_dir = data_dir,
   output_name = "F_weighted_average_neutrals.rds",
-  store_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+  store_dir = "data"
 )
 # 
 # # s = 0.02
-# Fs_nested_selectives_s0.02_f0.25 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/Fs_nested_selectives_s0.02_f0.25.rds")
+# Fs_nested_selectives_s0.02_f0.25 <- readRDS("data/Fs_nested_selectives_s0.02_f0.25.rds")
 # F_weighted_selectives_s0.02_f0.25 <- compute_weighted_Fs(
 #   Fs_nested = Fs_nested_selectives_s0.02_f0.25,
 #   breaks_dir = data_dir,
 #   output_name = "F_weighted_average_selectives_s0.02_f0.25.rds",
-#   store_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+#   store_dir = "data"
 # )
 # 
-# Fs_nested_selectives_s0.02_f0.5 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/Fs_nested_selectives_s0.02_f0.5.rds")
+# Fs_nested_selectives_s0.02_f0.5 <- readRDS("data/Fs_nested_selectives_s0.02_f0.5.rds")
 # F_weighted_selectives_s0.02_f0.5 <- compute_weighted_Fs(
 #   Fs_nested = Fs_nested_selectives_s0.02_f0.5,
 #   breaks_dir = data_dir,
 #   output_name = "F_weighted_average_selectives_s0.02_f0.5.rds",
-#   store_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+#   store_dir = "data"
 # )
 # 
-# Fs_nested_selectives_s0.02_f0.75 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/Fs_nested_selectives_s0.02_f0.75.rds")
+# Fs_nested_selectives_s0.02_f0.75 <- readRDS("data/Fs_nested_selectives_s0.02_f0.75.rds")
 # F_weighted_selectives_s0.02_f0.75 <- compute_weighted_Fs(
 #   Fs_nested = Fs_nested_selectives_s0.02_f0.75,
 #   breaks_dir = data_dir,
 #   output_name = "F_weighted_average_selectives_s0.02_f0.75.rds",
-#   store_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+#   store_dir = "data"
 # )
 # 
 # # s = 0.01
-# Fs_nested_selectives_s0.01_f0.25 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/Fs_nested_selectives_s0.01_f0.25.rds")
+# Fs_nested_selectives_s0.01_f0.25 <- readRDS("data/Fs_nested_selectives_s0.01_f0.25.rds")
 # F_weighted_selectives_s0.01_f0.25 <- compute_weighted_Fs(
 #   Fs_nested = Fs_nested_selectives_s0.01_f0.25,
 #   breaks_dir = data_dir,
 #   output_name = "F_weighted_average_selectives_s0.01_f0.25.rds",
-#   store_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+#   store_dir = "data"
 # )
 # 
-# Fs_nested_selectives_s0.01_f0.5 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/Fs_nested_selectives_s0.01_f0.5.rds")
+# Fs_nested_selectives_s0.01_f0.5 <- readRDS("data/Fs_nested_selectives_s0.01_f0.5.rds")
 # F_weighted_selectives_s0.01_f0.5 <- compute_weighted_Fs(
 #   Fs_nested = Fs_nested_selectives_s0.01_f0.5,
 #   breaks_dir = data_dir,
 #   output_name = "F_weighted_average_selectives_s0.01_f0.5.rds",
-#   store_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+#   store_dir = "data"
 # )
 
 # Fs_nested_selectives_s0.01_f0.75 <- readRDS("data/Fs_nested_selectives_s0.01_f0.75.rds")
@@ -193,52 +193,52 @@ F_weighted_neutrals <- compute_weighted_Fs(
 # )
 
 # # s = 0.003
-# Fs_nested_selectives_s0.003_f0.25 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/Fs_nested_selectives_s0.003_f0.25.rds")
+# Fs_nested_selectives_s0.003_f0.25 <- readRDS("data/Fs_nested_selectives_s0.003_f0.25.rds")
 # F_weighted_selectives_s0.003_f0.25 <- compute_weighted_Fs(
 #   Fs_nested = Fs_nested_selectives_s0.003_f0.25,
 #   breaks_dir = data_dir,
 #   output_name = "F_weighted_average_selectives_s0.003_f0.25.rds",
-#   store_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+#   store_dir = "data"
 # )
 # 
-# Fs_nested_selectives_s0.003_f0.5 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/Fs_nested_selectives_s0.003_f0.5.rds")
+# Fs_nested_selectives_s0.003_f0.5 <- readRDS("data/Fs_nested_selectives_s0.003_f0.5.rds")
 # F_weighted_selectives_s0.003_f0.5 <- compute_weighted_Fs(
 #   Fs_nested = Fs_nested_selectives_s0.003_f0.5,
 #   breaks_dir = data_dir,
 #   output_name = "F_weighted_average_selectives_s0.003_f0.5.rds",
-#   store_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+#   store_dir = "data"
 # )
 # 
-# Fs_nested_selectives_s0.003_f0.75 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/Fs_nested_selectives_s0.003_f0.75.rds")
+# Fs_nested_selectives_s0.003_f0.75 <- readRDS("data/Fs_nested_selectives_s0.003_f0.75.rds")
 # F_weighted_selectives_s0.003_f0.75 <- compute_weighted_Fs(
 #   Fs_nested = Fs_nested_selectives_s0.003_f0.75,
 #   breaks_dir = data_dir,
 #   output_name = "F_weighted_average_selectives_s0.003_f0.75.rds",
-#   store_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+#   store_dir = "data"
 # )
 # # s = 0.001
-# Fs_nested_selectives_s0.001_f0.25 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/Fs_nested_selectives_s0.001_f0.25.rds")
+# Fs_nested_selectives_s0.001_f0.25 <- readRDS("data/Fs_nested_selectives_s0.001_f0.25.rds")
 # F_weighted_selectives_s0.001_f0.25 <- compute_weighted_Fs(
 #   Fs_nested = Fs_nested_selectives_s0.001_f0.25,
 #   breaks_dir = data_dir,
 #   output_name = "F_weighted_average_selectives_s0.001_f0.25.rds",
-#   store_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+#   store_dir = "data"
 # )
 # 
-# Fs_nested_selectives_s0.001_f0.5 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/Fs_nested_selectives_s0.001_f0.5.rds")
+# Fs_nested_selectives_s0.001_f0.5 <- readRDS("data/Fs_nested_selectives_s0.001_f0.5.rds")
 # F_weighted_selectives_s0.001_f0.5 <- compute_weighted_Fs(
 #   Fs_nested = Fs_nested_selectives_s0.001_f0.5,
 #   breaks_dir = data_dir,
 #   output_name = "F_weighted_average_selectives_s0.001_f0.5.rds",
-#   store_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+#   store_dir = "data"
 # )
 # 
-# Fs_nested_selectives_s0.001_f0.75 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/Fs_nested_selectives_s0.001_f0.75.rds")
+# Fs_nested_selectives_s0.001_f0.75 <- readRDS("data/Fs_nested_selectives_s0.001_f0.75.rds")
 # F_weighted_selectives_s0.001_f0.75 <- compute_weighted_Fs(
 #   Fs_nested = Fs_nested_selectives_s0.001_f0.75,
 #   breaks_dir = data_dir,
 #   output_name = "F_weighted_average_selectives_s0.001_f0.75.rds",
-#   store_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+#   store_dir = "data"
 # )
 ```
 
@@ -403,7 +403,7 @@ F_weighted_selectives_s0.001_f0.75 <- compute_weighted_Fs_around_positive_mutati
 # Example usage:
 # Fs_nested_neutrals <- readRDS("data/Fs_nested_neutrals.rds")
 # F_empirical_kingman <- compute_empirical_kingman(F_weighted_neutrals, output_path = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/F_empirical_kingman.rds")
-F_empirical_kingman <- compute_empirical_kingman_2(F_weighted_neutrals, output_path = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/F_empirical_kingman.rds")
+F_empirical_kingman <- compute_empirical_kingman_2(F_weighted_neutrals, output_path = "data/F_empirical_kingman.rds")
 ```
 
 ## Calculate Weighted F-matrix (FW) for each trees
@@ -412,48 +412,48 @@ F_empirical_kingman <- compute_empirical_kingman_2(F_weighted_neutrals, output_p
 # --- Compute & Save Weighted F-matrices for All Scenarios --------------------
 
 # # Neutral
-# neutrals <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/neutrals.rds")
-# FWs_neutrals <- compute_and_save_FWs_nested(neutrals, "neutrals", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
+# neutrals <- readRDS("data/neutrals.rds")
+# FWs_neutrals <- compute_and_save_FWs_nested(neutrals, "neutrals", out_dir = "data")
 # 
 # # s = 0.02
-# selectives_s0.02_f0.25 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/selectives_s0.02_f0.25.rds")
-# FWs_selectives_s0.02_f0.25 <- compute_and_save_FWs_nested(selectives_s0.02_f0.25, "selectives_s0.02_f0.25", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
+# selectives_s0.02_f0.25 <- readRDS("data/selectives_s0.02_f0.25.rds")
+# FWs_selectives_s0.02_f0.25 <- compute_and_save_FWs_nested(selectives_s0.02_f0.25, "selectives_s0.02_f0.25", out_dir = "data")
 # 
-# selectives_s0.02_f0.5 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/selectives_s0.02_f0.5.rds")
-# FWs_selectives_s0.02_f0.5 <- compute_and_save_FWs_nested(selectives_s0.02_f0.5, "selectives_s0.02_f0.5", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
+# selectives_s0.02_f0.5 <- readRDS("data/selectives_s0.02_f0.5.rds")
+# FWs_selectives_s0.02_f0.5 <- compute_and_save_FWs_nested(selectives_s0.02_f0.5, "selectives_s0.02_f0.5", out_dir = "data")
 # 
-# selectives_s0.02_f0.75 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/selectives_s0.02_f0.75.rds")
-# FWs_selectives_s0.02_f0.75 <- compute_and_save_FWs_nested(selectives_s0.02_f0.75, "selectives_s0.02_f0.75", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
+# selectives_s0.02_f0.75 <- readRDS("data/selectives_s0.02_f0.75.rds")
+# FWs_selectives_s0.02_f0.75 <- compute_and_save_FWs_nested(selectives_s0.02_f0.75, "selectives_s0.02_f0.75", out_dir = "data")
 # 
 # # s = 0.01
-# selectives_s0.01_f0.25 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/selectives_s0.01_f0.25.rds")
-# FWs_selectives_s0.01_f0.25 <- compute_and_save_FWs_nested(selectives_s0.01_f0.25, "selectives_s0.01_f0.25", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
+# selectives_s0.01_f0.25 <- readRDS("data/selectives_s0.01_f0.25.rds")
+# FWs_selectives_s0.01_f0.25 <- compute_and_save_FWs_nested(selectives_s0.01_f0.25, "selectives_s0.01_f0.25", out_dir = "data")
 
-selectives_s0.01_f0.5 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/selectives_s0.01_f0.5.rds")
-FWs_selectives_s0.01_f0.5 <- compute_and_save_FWs_nested(selectives_s0.01_f0.5, "selectives_s0.01_f0.5", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
+selectives_s0.01_f0.5 <- readRDS("data/selectives_s0.01_f0.5.rds")
+FWs_selectives_s0.01_f0.5 <- compute_and_save_FWs_nested(selectives_s0.01_f0.5, "selectives_s0.01_f0.5", out_dir = "data")
 
-selectives_s0.01_f0.75 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/selectives_s0.01_f0.75.rds")
-FWs_selectives_s0.01_f0.75 <- compute_and_save_FWs_nested(selectives_s0.01_f0.75, "selectives_s0.01_f0.75", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
+selectives_s0.01_f0.75 <- readRDS("data/selectives_s0.01_f0.75.rds")
+FWs_selectives_s0.01_f0.75 <- compute_and_save_FWs_nested(selectives_s0.01_f0.75, "selectives_s0.01_f0.75", out_dir = "data")
 
 # s = 0.003
-selectives_s0.003_f0.25 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/selectives_s0.003_f0.25.rds")
-FWs_selectives_s0.003_f0.25 <- compute_and_save_FWs_nested(selectives_s0.003_f0.25, "selectives_s0.003_f0.25", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
+selectives_s0.003_f0.25 <- readRDS("data/selectives_s0.003_f0.25.rds")
+FWs_selectives_s0.003_f0.25 <- compute_and_save_FWs_nested(selectives_s0.003_f0.25, "selectives_s0.003_f0.25", out_dir = "data")
 
-selectives_s0.003_f0.5 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/selectives_s0.003_f0.5.rds")
-FWs_selectives_s0.003_f0.5 <- compute_and_save_FWs_nested(selectives_s0.003_f0.5, "selectives_s0.003_f0.5", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
+selectives_s0.003_f0.5 <- readRDS("data/selectives_s0.003_f0.5.rds")
+FWs_selectives_s0.003_f0.5 <- compute_and_save_FWs_nested(selectives_s0.003_f0.5, "selectives_s0.003_f0.5", out_dir = "data")
 
-selectives_s0.003_f0.75 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/selectives_s0.003_f0.75.rds")
-FWs_selectives_s0.003_f0.75 <- compute_and_save_FWs_nested(selectives_s0.003_f0.75, "selectives_s0.003_f0.75", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
+selectives_s0.003_f0.75 <- readRDS("data/selectives_s0.003_f0.75.rds")
+FWs_selectives_s0.003_f0.75 <- compute_and_save_FWs_nested(selectives_s0.003_f0.75, "selectives_s0.003_f0.75", out_dir = "data")
 
 # s = 0.001
-selectives_s0.001_f0.25 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/selectives_s0.001_f0.25.rds")
-FWs_selectives_s0.001_f0.25 <- compute_and_save_FWs_nested(selectives_s0.001_f0.25, "selectives_s0.001_f0.25", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
+selectives_s0.001_f0.25 <- readRDS("data/selectives_s0.001_f0.25.rds")
+FWs_selectives_s0.001_f0.25 <- compute_and_save_FWs_nested(selectives_s0.001_f0.25, "selectives_s0.001_f0.25", out_dir = "data")
 
-selectives_s0.001_f0.5 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/selectives_s0.001_f0.5.rds")
-FWs_selectives_s0.001_f0.5 <- compute_and_save_FWs_nested(selectives_s0.001_f0.5, "selectives_s0.001_f0.5", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
+selectives_s0.001_f0.5 <- readRDS("data/selectives_s0.001_f0.5.rds")
+FWs_selectives_s0.001_f0.5 <- compute_and_save_FWs_nested(selectives_s0.001_f0.5, "selectives_s0.001_f0.5", out_dir = "data")
 
-selectives_s0.001_f0.75 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/selectives_s0.001_f0.75.rds")
-FWs_selectives_s0.001_f0.75 <- compute_and_save_FWs_nested(selectives_s0.001_f0.75, "selectives_s0.001_f0.75", out_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data")
+selectives_s0.001_f0.75 <- readRDS("data/selectives_s0.001_f0.75.rds")
+FWs_selectives_s0.001_f0.75 <- compute_and_save_FWs_nested(selectives_s0.001_f0.75, "selectives_s0.001_f0.75", out_dir = "data")
 ```
 
 ## Calculate weighted-average Weighted F-matrix (FW) for each trees
@@ -462,112 +462,112 @@ FWs_selectives_s0.001_f0.75 <- compute_and_save_FWs_nested(selectives_s0.001_f0.
 # --- Load and compute weighted-average of Weighted F-matrices (FWs) ----------
 
 # Neutral
-# FWs_nested_neutrals <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/FWs_nested_neutrals.rds")
+# FWs_nested_neutrals <- readRDS("data/FWs_nested_neutrals.rds")
 # FW_weighted_neutrals <- compute_weighted_Fs(
 #   Fs_nested = FWs_nested_neutrals,
 #   breaks_dir = data_dir,
 #   output_name = "FW_weighted_average_neutrals.rds",
-#   store_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+#   store_dir = "data"
 # )
 # 
 # # s = 0.02
-# FWs_nested_selectives_s0.02_f0.25 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/FWs_nested_selectives_s0.02_f0.25.rds")
+# FWs_nested_selectives_s0.02_f0.25 <- readRDS("data/FWs_nested_selectives_s0.02_f0.25.rds")
 # F_weighted_selectives_s0.02_f0.25 <- compute_weighted_Fs(
 #   Fs_nested = FWs_nested_selectives_s0.02_f0.25,
 #   breaks_dir = data_dir,
 #   output_name = "FW_weighted_average_selectives_s0.02_f0.25.rds",
-#   store_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+#   store_dir = "data"
 # )
 # 
-# FWs_nested_selectives_s0.02_f0.5 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/FWs_nested_selectives_s0.02_f0.5.rds")
+# FWs_nested_selectives_s0.02_f0.5 <- readRDS("data/FWs_nested_selectives_s0.02_f0.5.rds")
 # F_weighted_selectives_s0.02_f0.5 <- compute_weighted_Fs(
 #   Fs_nested = FWs_nested_selectives_s0.02_f0.5,
 #   breaks_dir = data_dir,
 #   output_name = "FW_weighted_average_selectives_s0.02_f0.5.rds",
-#   store_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+#   store_dir = "data"
 # )
 # 
-# FWs_nested_selectives_s0.02_f0.75 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/FWs_nested_selectives_s0.02_f0.75.rds")
+# FWs_nested_selectives_s0.02_f0.75 <- readRDS("data/FWs_nested_selectives_s0.02_f0.75.rds")
 # F_weighted_selectives_s0.02_f0.75 <- compute_weighted_Fs(
 #   Fs_nested = FWs_nested_selectives_s0.02_f0.75,
 #   breaks_dir = data_dir,
 #   output_name = "FW_weighted_average_selectives_s0.02_f0.75.rds",
-#   store_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+#   store_dir = "data"
 # )
 # 
 # # s = 0.01
-# FWs_nested_selectives_s0.01_f0.25 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/FWs_nested_selectives_s0.01_f0.25.rds")
+# FWs_nested_selectives_s0.01_f0.25 <- readRDS("data/FWs_nested_selectives_s0.01_f0.25.rds")
 # F_weighted_selectives_s0.01_f0.25 <- compute_weighted_Fs(
 #   Fs_nested = FWs_nested_selectives_s0.01_f0.25,
 #   breaks_dir = data_dir,
 #   output_name = "FW_weighted_average_selectives_s0.01_f0.25.rds",
-#   store_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+#   store_dir = "data"
 # )
 # #
-# FWs_nested_selectives_s0.01_f0.5 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/FWs_nested_selectives_s0.01_f0.5.rds")
+# FWs_nested_selectives_s0.01_f0.5 <- readRDS("data/FWs_nested_selectives_s0.01_f0.5.rds")
 # F_weighted_selectives_s0.01_f0.5 <- compute_weighted_Fs(
 #   Fs_nested = FWs_nested_selectives_s0.01_f0.5,
 #   breaks_dir = data_dir,
 #   output_name = "FW_weighted_average_selectives_s0.01_f0.5.rds",
-#   store_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+#   store_dir = "data"
 # )
 # 
-# FWs_nested_selectives_s0.01_f0.75 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/FWs_nested_selectives_s0.01_f0.75.rds")
+# FWs_nested_selectives_s0.01_f0.75 <- readRDS("data/FWs_nested_selectives_s0.01_f0.75.rds")
 # FW_weighted_selectives_s0.01_f0.75 <- compute_weighted_Fs(
 #   Fs_nested = FWs_nested_selectives_s0.01_f0.75,
 #   breaks_dir = data_dir,
 #   output_name = "FW_weighted_average_selectives_s0.01_f0.75.rds",
-#   store_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+#   store_dir = "data"
 # )
 
 # s = 0.003
-FWs_nested_selectives_s0.003_f0.25 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/FWs_nested_selectives_s0.003_f0.25.rds")
+FWs_nested_selectives_s0.003_f0.25 <- readRDS("data/FWs_nested_selectives_s0.003_f0.25.rds")
 F_weighted_selectives_s0.003_f0.25 <- compute_weighted_Fs(
   Fs_nested = FWs_nested_selectives_s0.003_f0.25,
   breaks_dir = data_dir,
   output_name = "FW_weighted_average_selectives_s0.003_f0.25.rds",
-  store_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+  store_dir = "data"
 )
 # 
-FWs_nested_selectives_s0.003_f0.5 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/FWs_nested_selectives_s0.003_f0.5.rds")
+FWs_nested_selectives_s0.003_f0.5 <- readRDS("data/FWs_nested_selectives_s0.003_f0.5.rds")
 F_weighted_selectives_s0.003_f0.5 <- compute_weighted_Fs(
   Fs_nested = FWs_nested_selectives_s0.003_f0.5,
   breaks_dir = data_dir,
   output_name = "FW_weighted_average_selectives_s0.003_f0.5.rds",
-  store_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+  store_dir = "data"
 )
 # 
-FWs_nested_selectives_s0.003_f0.75 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/FWs_nested_selectives_s0.003_f0.75.rds")
+FWs_nested_selectives_s0.003_f0.75 <- readRDS("data/FWs_nested_selectives_s0.003_f0.75.rds")
 F_weighted_selectives_s0.003_f0.75 <- compute_weighted_Fs(
   Fs_nested = FWs_nested_selectives_s0.003_f0.75,
   breaks_dir = data_dir,
   output_name = "FW_weighted_average_selectives_s0.003_f0.75.rds",
-  store_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+  store_dir = "data"
 )
 # 
 # # s = 0.001
-FWs_nested_selectives_s0.001_f0.25 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/FWs_nested_selectives_s0.001_f0.25.rds")
+FWs_nested_selectives_s0.001_f0.25 <- readRDS("data/FWs_nested_selectives_s0.001_f0.25.rds")
 F_weighted_selectives_s0.001_f0.25 <- compute_weighted_Fs(
   Fs_nested = FWs_nested_selectives_s0.001_f0.25,
   breaks_dir = data_dir,
   output_name = "FW_weighted_average_selectives_s0.001_f0.25.rds",
-  store_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+  store_dir = "data"
 )
 # 
-FWs_nested_selectives_s0.001_f0.5 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/FWs_nested_selectives_s0.001_f0.5.rds")
+FWs_nested_selectives_s0.001_f0.5 <- readRDS("data/FWs_nested_selectives_s0.001_f0.5.rds")
 F_weighted_selectives_s0.001_f0.5 <- compute_weighted_Fs(
   Fs_nested = FWs_nested_selectives_s0.001_f0.5,
   breaks_dir = data_dir,
   output_name = "FW_weighted_average_selectives_s0.001_f0.5.rds",
-  store_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+  store_dir = "data"
 )
 # 
-FWs_nested_selectives_s0.001_f0.75 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/FWs_nested_selectives_s0.001_f0.75.rds")
+FWs_nested_selectives_s0.001_f0.75 <- readRDS("data/FWs_nested_selectives_s0.001_f0.75.rds")
 F_weighted_selectives_s0.001_f0.75 <- compute_weighted_Fs(
   Fs_nested = FWs_nested_selectives_s0.001_f0.75,
   breaks_dir = data_dir,
   output_name = "FW_weighted_average_selectives_s0.001_f0.75.rds",
-  store_dir = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+  store_dir = "data"
 )
 ```
 
@@ -667,65 +667,65 @@ breaks_folder <- "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios La
 # )
 
 # s = 0.003
-FWs_nested_selectives_s0.003_f0.25 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/FWs_nested_selectives_s0.003_f0.25.rds")
+FWs_nested_selectives_s0.003_f0.25 <- readRDS("data/FWs_nested_selectives_s0.003_f0.25.rds")
 FW_weighted_selectives_s0.003_f0.25 <- compute_weighted_Fs_around_positive_mutation(
   Fs_nested   = FWs_nested_selectives_s0.003_f0.25,
   breaks_dir  = data_dir,
   base        = base,
   range       = range,
   output_name = "FW_weighted_average_around_positive_mutation_selectives_s0.003_f0.25.rds",
-  store_dir   = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+  store_dir   = "data"
 )
 
-FWs_nested_selectives_s0.003_f0.5 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/FWs_nested_selectives_s0.003_f0.5.rds")
+FWs_nested_selectives_s0.003_f0.5 <- readRDS("data/FWs_nested_selectives_s0.003_f0.5.rds")
 FW_weighted_selectives_s0.003_f0.5 <- compute_weighted_Fs_around_positive_mutation(
   Fs_nested   = FWs_nested_selectives_s0.003_f0.5,
   breaks_dir  = data_dir,
   base        = base,
   range       = range,
   output_name = "FW_weighted_average_around_positive_mutation_selectives_s0.003_f0.5.rds",
-  store_dir   = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+  store_dir   = "data"
 )
 
-FWs_nested_selectives_s0.003_f0.75 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/FWs_nested_selectives_s0.003_f0.75.rds")
+FWs_nested_selectives_s0.003_f0.75 <- readRDS("data/FWs_nested_selectives_s0.003_f0.75.rds")
 FW_weighted_selectives_s0.003_f0.75 <- compute_weighted_Fs_around_positive_mutation(
   Fs_nested   = FWs_nested_selectives_s0.003_f0.75,
   breaks_dir  = data_dir,
   base        = base,
   range       = range,
   output_name = "FW_weighted_average_around_positive_mutation_selectives_s0.003_f0.75.rds",
-  store_dir   = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+  store_dir   = "data"
 )
 
 # s = 0.001
-FWs_nested_selectives_s0.001_f0.25 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/FWs_nested_selectives_s0.001_f0.25.rds")
+FWs_nested_selectives_s0.001_f0.25 <- readRDS("data/FWs_nested_selectives_s0.001_f0.25.rds")
 FW_weighted_selectives_s0.001_f0.25 <- compute_weighted_Fs_around_positive_mutation(
   Fs_nested   = FWs_nested_selectives_s0.001_f0.25,
   breaks_dir  = data_dir,
   base        = base,
   range       = range,
   output_name = "FW_weighted_average_around_positive_mutation_selectives_s0.001_f0.25.rds",
-  store_dir   = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+  store_dir   = "data"
 )
 
-FWs_nested_selectives_s0.001_f0.5 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/FWs_nested_selectives_s0.001_f0.5.rds")
+FWs_nested_selectives_s0.001_f0.5 <- readRDS("data/FWs_nested_selectives_s0.001_f0.5.rds")
 FW_weighted_selectives_s0.001_f0.5 <- compute_weighted_Fs_around_positive_mutation(
   Fs_nested   = FWs_nested_selectives_s0.001_f0.5,
   breaks_dir  = data_dir,
   base        = base,
   range       = range,
   output_name = "FW_weighted_average_around_positive_mutation_selectives_s0.001_f0.5.rds",
-  store_dir   = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+  store_dir   = "data"
 )
 
-FWs_nested_selectives_s0.001_f0.75 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/FWs_nested_selectives_s0.001_f0.75.rds")
+FWs_nested_selectives_s0.001_f0.75 <- readRDS("data/FWs_nested_selectives_s0.001_f0.75.rds")
 FW_weighted_selectives_s0.001_f0.75 <- compute_weighted_Fs_around_positive_mutation(
   Fs_nested   = FWs_nested_selectives_s0.001_f0.75,
   breaks_dir  = data_dir,
   base        = base,
   range       = range,
   output_name = "FW_weighted_average_around_positive_mutation_selectives_s0.001_f0.75.rds",
-  store_dir   = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data"
+  store_dir   = "data"
 )
 ```
 
@@ -733,6 +733,6 @@ FW_weighted_selectives_s0.001_f0.75 <- compute_weighted_Fs_around_positive_mutat
 
 ```{r}
 # Example usage:
-FW_weighted_neutrals <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/FW_weighted_average_neutrals.rds")
-FW_empirical_kingman <- compute_empirical_kingman_2(FW_weighted_neutrals, output_path = "/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/FW_empirical_kingman.rds")
+FW_weighted_neutrals <- readRDS("data/FW_weighted_average_neutrals.rds")
+FW_empirical_kingman <- compute_empirical_kingman_2(FW_weighted_neutrals, output_path = "data/FW_empirical_kingman.rds")
 ```
