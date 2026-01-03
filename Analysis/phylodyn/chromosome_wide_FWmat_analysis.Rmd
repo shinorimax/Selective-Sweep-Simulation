@@ -488,7 +488,7 @@ for (s in s_vals) for (F in f_vals) {
 }
 ```
 
-## Calculate and store d-1 weighted distance to Kingman
+## Calculate and store d-1 weighted distance to Kingman around selective region
 
 ```{r}
 FW_weighted_neutrals <- readRDS("data/FW_weighted_average_around_positive_mutation_neutrals.rds")
@@ -577,7 +577,7 @@ d_neutral_test <- vapply(
 
 # --- Output directory (relative to Analysis/phylodyn/*) -----------------------
 # roc_dir <- file.path("..", "..", "SliM", "roc")   # ../../SliM/roc
-roc_dir <- "../roc"
+roc_dir <- "../roc_onlysimloc"
 dir.create(roc_dir, showWarnings = FALSE, recursive = TRUE)
 
 # --- Scenario grid -------------------------------------------------------------

@@ -884,7 +884,7 @@ d_neutral_test <- vapply(
 
 # --- Output directory (relative to Analysis/phylodyn/*) -----------------------
 # roc_dir <- file.path("..", "..", "SliM", "roc")   # ../../SliM/roc
-roc_dir <- "../roc" 
+roc_dir <- "../roc_onlysimloc" 
 dir.create(roc_dir, showWarnings = FALSE, recursive = TRUE)
 
 # --- Scenario grid -------------------------------------------------------------

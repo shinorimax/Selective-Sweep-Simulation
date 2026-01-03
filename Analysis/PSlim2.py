@@ -367,7 +367,7 @@ class Experiment:
                 json.dump({0: {'t': ti.tolist(), 'a': (1 / ai).tolist()}}, fp)
         print('Done!')
 
-    def est(self, BIM, setid, now=2, srun=None, arg=""):
+    def est(self, BIM, setid, now=2, srun=None, arg="", onlysimloc=False):
         import os, shutil, sys, numpy as np, subprocess
 
         Arg = self.Args[setid]
@@ -403,7 +403,10 @@ class Experiment:
         for sz in chunk_sizes:
             if sz == 0:
                 continue
-            out = os.path.join('outs', f"{np.random.randint(1e8, 1_000_000_000-1):09d}.csv")
+            if onlysimloc:
+                out = os.path.join('outs_onlysimloc', f"{np.random.randint(1e8, 1_000_000_000-1):09d}.csv")
+            else:
+                out = os.path.join('outs', f"{np.random.randint(1e8, 1_000_000_000-1):09d}.csv")
             self.outs[setid].append(out)
             chunk = [next(it) for _ in range(sz)]
             argv = prefix + chunk + [
@@ -449,13 +452,19 @@ class Experiment:
     #         except FileNotFoundError:
     #             pass
 
-    def merge_outs_nonstrict(self, setid, name=None):
+    def merge_outs_nonstrict(self, setid, name=None, onlysimloc=False):
         outs = self.outs.get(setid, [])
         if not outs:
             raise ValueError(f"No outs recorded for setid={setid}. Did you run est()?")
 
         if name is None:
-            name = self.df[setid]
+            if onlysimloc:
+                # Extract the filename from self.df[setid] and use outs_onlysimloc directory
+                base_name = os.path.basename(self.df[setid])
+                name = os.path.join('outs_onlysimloc', base_name)
+                _ensure_dirs('outs_onlysimloc')
+            else:
+                name = self.df[setid]
 
         df = pd.concat([pd.read_csv(out, comment='#') for out in outs]).reset_index(drop=True)
 
