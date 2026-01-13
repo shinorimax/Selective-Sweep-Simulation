@@ -101,5 +101,14 @@ The project uses **two reproducible conda environments** to maintain compatibili
 
 To create them from scratch:
 ```bash
-conda env create -f Simulation/Slim(primary)/env_sim312.yml
+conda env create -f Simulation/Slim\(primary\)/env_sim312.yml
+conda activate sim312
+conda install ipykernel
+python -m ipykernel install --user --name sim312 --display-name "sim312"
+```
+
+```bash
 conda env create -f Analysis/env_sweep312.yml
+conda activate sweep312
+conda install ipykernel
+python -m ipykernel install --user --name sweep312 --display-name "sweep312"
