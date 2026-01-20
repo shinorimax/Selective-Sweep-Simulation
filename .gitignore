@@ -37,6 +37,7 @@ Simulation/Slim(primary)/etas/
 Simulation/Slim(primary)/sim.vcz
 Simulation/Slim(primary)/tsinfer_test
 Simulation/Slim(primary)/roc/
+Simulation/Slim(primary)/dist_all/
 Simulation/Slim(primary)/Calculation---Constant_Directional_Selection.ipynb
 Simulation/Slim(primary)/tsinfer.ipynb
 
@@ -48,6 +49,7 @@ Simulation/msprime(secondary)/*
 ## Exclude data storage in Analysis/phylodyn (except load_and_store_data.Rmd)
 Analysis/phylodyn/*
 !Analysis/phylodyn/load_and_store_data.Rmd
+!Analysis/phylodyn/dist_all.Rmd
 Analysis/phylodyn/data/
 
 Analysis/phylodyn.Rmd

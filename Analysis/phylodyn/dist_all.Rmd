@@ -1,0 +1,388 @@
+---
+title: "dist_all"
+author: "Shinnosuke Yagi"
+date: "2025-11-02"
+output: html_document
+---
+
+## Overview
+
+Compute d1 distances from every individual F-matrix to the empirical Kingman mean,
+and attach tree positional information from the corresponding `_breaks.csv` files.
+
+## Import Libraries
+
+```{r, message=FALSE}
+library(dplyr)
+library(readr)
+library(purrr)
+library(stringr)
+library(phylodyn)
+```
+
+## Paths and helpers
+
+```{r}
+data_dir <- "data"
+breaks_dir <- "../../Simulation/Slim(primary)/trees_newick"
+
+F_mean_neutral <- readRDS(file.path(data_dir, "F_empirical_kingman.rds"))
+FW_mean_neutral <- readRDS(file.path(data_dir, "FW_empirical_kingman.rds"))
+
+dist_d1 <- function(F1, F2) {
+  sum(abs(F1 - F2))
+}
+
+fmt <- function(x) {
+  out <- format(x, trim = TRUE, scientific = FALSE)
+  out <- sub("0+$", "", sub("\\.$", "", out))
+  out
+}
+
+load_Fs_nested <- function(s_str, f_str) {
+  candidates <- c(
+    file.path(data_dir, sprintf("Fs_nested_selectives_s%s_f%s.rds", s_str, f_str)),
+    file.path(data_dir, sprintf("F_weighted_average_selectives_s%s_f%s.rds", s_str, f_str))
+  )
+  path <- candidates[file.exists(candidates)][1]
+  if (is.na(path)) {
+    return(NULL)
+  }
+  readRDS(path)
+}
+
+load_FWs_nested <- function(s_str, f_str) {
+  candidates <- c(
+    file.path(data_dir, sprintf("FWs_nested_selectives_s%s_f%s.rds", s_str, f_str)),
+    file.path(data_dir, sprintf("FW_weighted_average_selectives_s%s_f%s.rds", s_str, f_str))
+  )
+  path <- candidates[file.exists(candidates)][1]
+  if (is.na(path)) {
+    return(NULL)
+  }
+  readRDS(path)
+}
+
+distances_with_positions <- function(Fs_nested, breaks_dir, scenario_tag, show_progress = TRUE) {
+  if (is.null(Fs_nested)) return(tibble())
+
+  if (is.null(names(Fs_nested))) {
+    stop("Fs_nested must be a named list (tree sequence filenames as names).")
+  }
+
+  if (show_progress) {
+    pb <- txtProgressBar(min = 0, max = length(Fs_nested), style = 3)
+    on.exit(close(pb), add = TRUE)
+  }
+
+  results <- vector("list", length(Fs_nested))
+  for (i in seq_along(Fs_nested)) {
+    if (show_progress) setTxtProgressBar(pb, i)
+    stem <- names(Fs_nested)[i]
+    csv_path <- file.path(breaks_dir, paste0(sub("\\.tree$", "", stem), "_breaks.csv"))
+    if (!file.exists(csv_path)) {
+      warning("Missing break file: ", csv_path)
+      next
+    }
+
+    df_breaks <- read_csv(csv_path, show_col_types = FALSE)
+    df_breaks <- df_breaks[order(df_breaks$tree_index), ]
+
+    F_list <- Fs_nested[[i]]
+    n_use <- min(length(F_list), nrow(df_breaks))
+    if (length(F_list) != nrow(df_breaks)) {
+      warning(sprintf("Length mismatch for %s (Fs=%d, breaks=%d); truncating to %d",
+                      stem, length(F_list), nrow(df_breaks), n_use))
+    }
+
+    distances <- vapply(
+      F_list[seq_len(n_use)],
+      function(Fmat) dist_d1(Fmat, F_mean_neutral),
+      numeric(1)
+    )
+
+    results[[i]] <- tibble(
+      scenario = scenario_tag,
+      file = df_breaks$file[seq_len(n_use)],
+      tree_index = df_breaks$tree_index[seq_len(n_use)],
+      left = df_breaks$left[seq_len(n_use)],
+      right = df_breaks$right[seq_len(n_use)],
+      mid = df_breaks$mid[seq_len(n_use)],
+      distance = distances
+    )
+  }
+
+  bind_rows(results)
+}
+
+distances_with_positions_from_trees <- function(trees_nested, breaks_dir, scenario_tag, tol = 8L,
+                                                show_progress = TRUE) {
+  if (is.null(trees_nested)) return(tibble())
+
+  if (is.null(names(trees_nested))) {
+    stop("trees_nested must be a named list (tree sequence filenames as names).")
+  }
+
+  if (show_progress) {
+    pb <- txtProgressBar(min = 0, max = length(trees_nested), style = 3)
+    on.exit(close(pb), add = TRUE)
+  }
+
+  results <- vector("list", length(trees_nested))
+  for (i in seq_along(trees_nested)) {
+    if (show_progress) setTxtProgressBar(pb, i)
+    stem <- names(trees_nested)[i]
+    csv_path <- file.path(breaks_dir, paste0(sub("\\.tree$", "", stem), "_breaks.csv"))
+    if (!file.exists(csv_path)) {
+      warning("Missing break file: ", csv_path)
+      next
+    }
+
+    df_breaks <- read_csv(csv_path, show_col_types = FALSE)
+    df_breaks <- df_breaks[order(df_breaks$tree_index), ]
+
+    trees_i <- trees_nested[[i]]
+    n_use <- min(length(trees_i), nrow(df_breaks))
+    if (length(trees_i) != nrow(df_breaks)) {
+      warning(sprintf("Length mismatch for %s (trees=%d, breaks=%d); truncating to %d",
+                      stem, length(trees_i), nrow(df_breaks), n_use))
+    }
+
+    distances <- vapply(
+      trees_i[seq_len(n_use)],
+      function(tr) dist_d1(gen_Fmat(tr, tol = tol), F_mean_neutral),
+      numeric(1)
+    )
+
+    results[[i]] <- tibble(
+      scenario = scenario_tag,
+      file = df_breaks$file[seq_len(n_use)],
+      tree_index = df_breaks$tree_index[seq_len(n_use)],
+      left = df_breaks$left[seq_len(n_use)],
+      right = df_breaks$right[seq_len(n_use)],
+      mid = df_breaks$mid[seq_len(n_use)],
+      distance = distances
+    )
+  }
+
+  bind_rows(results)
+}
+
+distances_with_positions_fw <- function(FWs_nested, breaks_dir, scenario_tag, show_progress = TRUE) {
+  if (is.null(FWs_nested)) return(tibble())
+
+  if (is.null(names(FWs_nested))) {
+    stop("FWs_nested must be a named list (tree sequence filenames as names).")
+  }
+
+  if (show_progress) {
+    pb <- txtProgressBar(min = 0, max = length(FWs_nested), style = 3)
+    on.exit(close(pb), add = TRUE)
+  }
+
+  results <- vector("list", length(FWs_nested))
+  for (i in seq_along(FWs_nested)) {
+    if (show_progress) setTxtProgressBar(pb, i)
+    stem <- names(FWs_nested)[i]
+    csv_path <- file.path(breaks_dir, paste0(sub("\\.tree$", "", stem), "_breaks.csv"))
+    if (!file.exists(csv_path)) {
+      warning("Missing break file: ", csv_path)
+      next
+    }
+
+    df_breaks <- read_csv(csv_path, show_col_types = FALSE)
+    df_breaks <- df_breaks[order(df_breaks$tree_index), ]
+
+    FW_list <- FWs_nested[[i]]
+    n_use <- min(length(FW_list), nrow(df_breaks))
+    if (length(FW_list) != nrow(df_breaks)) {
+      warning(sprintf("Length mismatch for %s (FWs=%d, breaks=%d); truncating to %d",
+                      stem, length(FW_list), nrow(df_breaks), n_use))
+    }
+
+    distances <- vapply(
+      FW_list[seq_len(n_use)],
+      function(FWmat) dist_d1(FWmat, FW_mean_neutral),
+      numeric(1)
+    )
+
+    results[[i]] <- tibble(
+      scenario = scenario_tag,
+      file = df_breaks$file[seq_len(n_use)],
+      tree_index = df_breaks$tree_index[seq_len(n_use)],
+      left = df_breaks$left[seq_len(n_use)],
+      right = df_breaks$right[seq_len(n_use)],
+      mid = df_breaks$mid[seq_len(n_use)],
+      distance = distances
+    )
+  }
+
+  bind_rows(results)
+}
+
+distances_with_positions_from_trees_fw <- function(trees_nested, breaks_dir, scenario_tag, tol = 8L,
+                                                   show_progress = TRUE) {
+  if (is.null(trees_nested)) return(tibble())
+
+  if (is.null(names(trees_nested))) {
+    stop("trees_nested must be a named list (tree sequence filenames as names).")
+  }
+
+  if (show_progress) {
+    pb <- txtProgressBar(min = 0, max = length(trees_nested), style = 3)
+    on.exit(close(pb), add = TRUE)
+  }
+
+  results <- vector("list", length(trees_nested))
+  for (i in seq_along(trees_nested)) {
+    if (show_progress) setTxtProgressBar(pb, i)
+    stem <- names(trees_nested)[i]
+    csv_path <- file.path(breaks_dir, paste0(sub("\\.tree$", "", stem), "_breaks.csv"))
+    if (!file.exists(csv_path)) {
+      warning("Missing break file: ", csv_path)
+      next
+    }
+
+    df_breaks <- read_csv(csv_path, show_col_types = FALSE)
+    df_breaks <- df_breaks[order(df_breaks$tree_index), ]
+
+    trees_i <- trees_nested[[i]]
+    n_use <- min(length(trees_i), nrow(df_breaks))
+    if (length(trees_i) != nrow(df_breaks)) {
+      warning(sprintf("Length mismatch for %s (trees=%d, breaks=%d); truncating to %d",
+                      stem, length(trees_i), nrow(df_breaks), n_use))
+    }
+
+    distances <- vapply(
+      trees_i[seq_len(n_use)],
+      function(tr) {
+        tr_info <- phylodyn:::gen.tr.data2(tr, tol = tol)
+        FWmat <- tr_info$Fmat0 * tr_info$Wmat0
+        dist_d1(FWmat, FW_mean_neutral)
+      },
+      numeric(1)
+    )
+
+    results[[i]] <- tibble(
+      scenario = scenario_tag,
+      file = df_breaks$file[seq_len(n_use)],
+      tree_index = df_breaks$tree_index[seq_len(n_use)],
+      left = df_breaks$left[seq_len(n_use)],
+      right = df_breaks$right[seq_len(n_use)],
+      mid = df_breaks$mid[seq_len(n_use)],
+      distance = distances
+    )
+  }
+
+  bind_rows(results)
+}
+```
+
+## Compute distances for all scenarios
+
+```{r}
+out_dir <- "../dists_all"
+dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
+
+# --- Neutral (latter half of tree sequences) ---------------------------------
+neutral_trees <- readRDS(file.path(data_dir, "neutrals.rds"))
+n_total_neutral <- length(neutral_trees)
+half_idx_neutral <- floor(n_total_neutral / 2) + 1L
+neutral_latter_half <- neutral_trees[half_idx_neutral:n_total_neutral]
+
+neutral_tag <- "Neutral_latter_half"
+neutral_df <- distances_with_positions_from_trees(
+  neutral_latter_half,
+  breaks_dir,
+  neutral_tag
+)
+
+neutral_out <- file.path(out_dir, "dist_all_neutral_latter_half.csv")
+write.csv(neutral_df, neutral_out, row.names = FALSE)
+message("Wrote: ", neutral_out, " (n=", nrow(neutral_df), ")")
+```
+
+```{r}
+s_vals <- c(0.02, 0.01, 0.003, 0.001)
+f_vals <- c(0.25, 0.5, 0.75)
+
+all_results <- list()
+
+for (s in s_vals) for (F in f_vals) {
+  s_str <- fmt(s)
+  f_str <- fmt(F)
+  scenario_tag <- paste0("s=", s_str, "F=", f_str)
+
+  Fs_nested <- load_Fs_nested(s_str, f_str)
+  if (is.null(Fs_nested)) {
+    message("Skipping ", scenario_tag, " (missing F-matrix file)")
+    next
+  }
+
+  message("Processing ", scenario_tag, " ...")
+  df_dist <- distances_with_positions(Fs_nested, breaks_dir, scenario_tag, show_progress = TRUE)
+  message("Finished ", scenario_tag, " (n=", nrow(df_dist), ")")
+  all_results[[scenario_tag]] <- df_dist
+
+  out_csv <- file.path(out_dir, sprintf("dist_all_%s.csv", scenario_tag))
+  write.csv(df_dist, out_csv, row.names = FALSE)
+  message("Wrote: ", out_csv, " (n=", nrow(df_dist), ")")
+}
+
+all_distances <- bind_rows(all_results)
+write.csv(all_distances, file.path(out_dir, "dist_all_all_scenarios.csv"), row.names = FALSE)
+```
+
+## Compute distances for all scenarios (FW-matrix)
+
+```{r}
+out_dir_fw <- "../dists_all"
+dir.create(out_dir_fw, showWarnings = FALSE, recursive = TRUE)
+
+s_vals <- c(0.02, 0.01, 0.003, 0.001)
+f_vals <- c(0.25, 0.5, 0.75)
+
+all_results_fw <- list()
+
+# --- Neutral (latter half of tree sequences) ---------------------------------
+neutral_trees <- readRDS(file.path(data_dir, "neutrals.rds"))
+n_total_neutral <- length(neutral_trees)
+half_idx_neutral <- floor(n_total_neutral / 2) + 1L
+neutral_latter_half <- neutral_trees[half_idx_neutral:n_total_neutral]
+
+neutral_tag_fw <- "Neutral_latter_half_FW"
+neutral_df_fw <- distances_with_positions_from_trees_fw(
+  neutral_latter_half,
+  breaks_dir,
+  neutral_tag_fw,
+  show_progress = TRUE
+)
+
+neutral_out_fw <- file.path(out_dir_fw, "dist_all_FW_neutral_latter_half.csv")
+write.csv(neutral_df_fw, neutral_out_fw, row.names = FALSE)
+message("Wrote: ", neutral_out_fw, " (n=", nrow(neutral_df_fw), ")")
+
+for (s in s_vals) for (F in f_vals) {
+  s_str <- fmt(s)
+  f_str <- fmt(F)
+  scenario_tag <- paste0("s=", s_str, "F=", f_str)
+
+  FWs_nested <- load_FWs_nested(s_str, f_str)
+  if (is.null(FWs_nested)) {
+    message("Skipping FW ", scenario_tag, " (missing FW-matrix file)")
+    next
+  }
+
+  message("Processing FW ", scenario_tag, " ...")
+  df_dist_fw <- distances_with_positions_fw(FWs_nested, breaks_dir, scenario_tag, show_progress = TRUE)
+  message("Finished FW ", scenario_tag, " (n=", nrow(df_dist_fw), ")")
+  all_results_fw[[scenario_tag]] <- df_dist_fw
+
+  out_csv_fw <- file.path(out_dir_fw, sprintf("dist_all_FW_%s.csv", scenario_tag))
+  write.csv(df_dist_fw, out_csv_fw, row.names = FALSE)
+  message("Wrote: ", out_csv_fw, " (n=", nrow(df_dist_fw), ")")
+}
+
+all_distances_fw <- bind_rows(all_results_fw)
+write.csv(all_distances_fw, file.path(out_dir_fw, "dist_all_FW_all_scenarios.csv"), row.names = FALSE)
+```

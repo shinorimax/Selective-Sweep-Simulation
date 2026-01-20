@@ -334,5 +334,3 @@ compute_weighted_Fs_around_positive_mutation <- function(
   
   invisible(F_weighted_list)
 }
-
-?phylodyn:::gen.tr.data2
