@@ -20,6 +20,7 @@ venv-lct/
 .venv/
 __pycache__/
 .ipynb_checkpoints/
+*.pyc
 
 ## Exclude Conda Environment
 sweep312/
@@ -54,4 +55,5 @@ Analysis/phylodyn/data/
 
 Analysis/phylodyn.Rmd
 Analysis/phylodyn.nb.html
-Analysis/point_five.txt
+Analysis/point_five.txtvenv/
+.vscode/
