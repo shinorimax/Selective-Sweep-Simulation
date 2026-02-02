@@ -4,56 +4,73 @@
 .RData
 .Ruserdata
 .trees
+
+# Data files
 *.vcf
 *.vcf.gz
 *.npz
 
-# Exclude Results folder
-Results/
-Images/
+# Top-level folders
 1000genomes/
 argweaver/
+Images/
+Results/
 
-# Exclude Python virtual environments
+# Python environments and caches
 venv/
 venv-lct/
 .venv/
+sweep312/
 __pycache__/
 .ipynb_checkpoints/
 *.pyc
 
-## Exclude Conda Environment
-sweep312/
-
-## Exclude draft files in Simulation folder
-
-
-## Exclude Slim Result Files
+# Simulation: Slim results
+Simulation/Slim(primary)/Calculation---Constant_Directional_Selection.ipynb
+Simulation/Slim(primary)/checkpoints/
+Simulation/Slim(primary)/dist_all/
+Simulation/Slim(primary)/etas/
+Simulation/Slim(primary)/outs/
+Simulation/Slim(primary)/roc/
+Simulation/Slim(primary)/sim.vcz
+Simulation/Slim(primary)/slimfiles/
 Simulation/Slim(primary)/trees/
 Simulation/Slim(primary)/trees_newick/
-Simulation/Slim(primary)/outs/
-Simulation/Slim(primary)/checkpoints/
-Simulation/Slim(primary)/slimfiles/
-Simulation/Slim(primary)/etas/
-Simulation/Slim(primary)/sim.vcz
-Simulation/Slim(primary)/tsinfer_test
-Simulation/Slim(primary)/roc/
-Simulation/Slim(primary)/dist_all/
-Simulation/Slim(primary)/Calculation---Constant_Directional_Selection.ipynb
 Simulation/Slim(primary)/tsinfer.ipynb
+Simulation/Slim(primary)/tsinfer_test
 
-# Exclude msprime result files (except run.py)
+# Simulation: msprime results (except run.py)
 Simulation/msprime(secondary)/*
 !Simulation/msprime(secondary)/run.py
 
-
-## Exclude data storage in Analysis/phylodyn (except load_and_store_data.Rmd)
+# Analysis/phylodyn data (keep specific Rmd files)
 Analysis/phylodyn/*
-!Analysis/phylodyn/load_and_store_data.Rmd
 !Analysis/phylodyn/dist_all.Rmd
+!Analysis/phylodyn/dist_all_new.Rmd
+!Analysis/phylodyn/load_and_store_data.Rmd
 Analysis/phylodyn/data/
+Analysis/phylodyn/data2/
+Analysis/changepoint_outputs/
+Analysis/dist_all_2/
 
+# Analysis outputs
 Analysis/phylodyn.Rmd
 Analysis/phylodyn.nb.html
+Analysis/point_five.txt
 Analysis/point_five.txtvenv/
+
+# Editor settings
 .vscode/
+
+# macOS
+.DS_Store
+
+# macOS
+.DS_Store
+
+# generated outputs (do not commit)
+Analysis/dists_all_2/
+Analysis/roc/*.csv
+
+# macOS
+.DS_Store

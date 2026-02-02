@@ -1,0 +1,212 @@
+---
+title: "dist_all_new"
+author: "Shinnosuke Yagi"
+date: "2026-02-01"
+output: html_document
+---
+
+## Overview
+
+Compute d1 distances from each F-matrix to the empirical mean (neutral, first 250),
+attach tree positional information from the corresponding `_breaks.csv` files, and
+write distance tables for the new long-genome scenarios.
+
+## Import Libraries
+
+```{r, message=FALSE}
+library(dplyr)
+library(readr)
+library(purrr)
+library(stringr)
+library(phylodyn)
+```
+
+## Paths and helpers
+
+```{r}
+data_dir <- "data2"
+breaks_dir <- "../../Simulation/Slim(primary)/trees_newick"
+
+F_mean_neutral <- readRDS(file.path(data_dir, "F_empirical_mean_neutrals_r400_first250.rds"))
+
+dist_d1 <- function(F1, F2) {
+  sum(abs(F1 - F2))
+}
+
+fmt <- function(x) {
+  out <- format(x, trim = TRUE, scientific = FALSE)
+  out <- sub("0+$", "", sub("\\.$", "", out))
+  out
+}
+
+load_Fs_dir <- function(dir_path) {
+  files <- sort(list.files(dir_path, pattern = "\\.rds$", full.names = TRUE))
+  if (length(files) == 0L) return(NULL)
+  Fs_nested <- lapply(files, readRDS)
+  names(Fs_nested) <- paste0(sub("\\.rds$", "", basename(files)), ".tree")
+  Fs_nested
+}
+
+distances_with_positions <- function(Fs_nested, breaks_dir, scenario_tag, show_progress = TRUE) {
+  if (is.null(Fs_nested)) return(tibble())
+
+  if (is.null(names(Fs_nested))) {
+    stop("Fs_nested must be a named list (tree sequence filenames as names).")
+  }
+
+  if (show_progress) {
+    pb <- txtProgressBar(min = 0, max = length(Fs_nested), style = 3)
+    on.exit(close(pb), add = TRUE)
+  }
+
+  results <- vector("list", length(Fs_nested))
+  for (i in seq_along(Fs_nested)) {
+    if (show_progress) setTxtProgressBar(pb, i)
+    stem <- names(Fs_nested)[i]
+    csv_path <- file.path(breaks_dir, paste0(sub("\\.tree$", "", stem), "_breaks.csv"))
+    if (!file.exists(csv_path)) {
+      warning("Missing break file: ", csv_path)
+      next
+    }
+
+    df_breaks <- read_csv(csv_path, show_col_types = FALSE)
+    df_breaks <- df_breaks[order(df_breaks$tree_index), ]
+
+    F_list <- Fs_nested[[i]]
+    n_use <- min(length(F_list), nrow(df_breaks))
+    if (length(F_list) != nrow(df_breaks)) {
+      warning(sprintf("Length mismatch for %s (Fs=%d, breaks=%d); truncating to %d",
+                      stem, length(F_list), nrow(df_breaks), n_use))
+    }
+
+    distances <- vapply(
+      F_list[seq_len(n_use)],
+      function(Fmat) dist_d1(Fmat, F_mean_neutral),
+      numeric(1)
+    )
+
+    results[[i]] <- tibble(
+      scenario = scenario_tag,
+      file = df_breaks$file[seq_len(n_use)],
+      tree_index = df_breaks$tree_index[seq_len(n_use)],
+      left = df_breaks$left[seq_len(n_use)],
+      right = df_breaks$right[seq_len(n_use)],
+      mid = df_breaks$mid[seq_len(n_use)],
+      distance = distances
+    )
+  }
+
+  bind_rows(results)
+}
+
+distances_with_positions_from_files <- function(files, breaks_dir, scenario_tag, show_progress = TRUE) {
+  if (length(files) == 0L) return(tibble())
+
+  if (show_progress) {
+    pb <- txtProgressBar(min = 0, max = length(files), style = 3)
+    on.exit(close(pb), add = TRUE)
+  }
+
+  results <- vector("list", length(files))
+  for (i in seq_along(files)) {
+    if (show_progress) setTxtProgressBar(pb, i)
+    f <- files[[i]]
+    if (show_progress) {
+      cat(sprintf("\n[%s] %d/%d %s\n", scenario_tag, i, length(files), basename(f)))
+    }
+    F_list <- readRDS(f)
+    stem <- paste0(sub("\\.rds$", "", basename(f)), ".tree")
+    csv_path <- file.path(breaks_dir, paste0(sub("\\.tree$", "", stem), "_breaks.csv"))
+    if (!file.exists(csv_path)) {
+      warning("Missing break file: ", csv_path)
+      next
+    }
+
+    df_breaks <- read_csv(csv_path, show_col_types = FALSE)
+    df_breaks <- df_breaks[order(df_breaks$tree_index), ]
+
+    n_use <- min(length(F_list), nrow(df_breaks))
+    if (length(F_list) != nrow(df_breaks)) {
+      warning(sprintf("Length mismatch for %s (Fs=%d, breaks=%d); truncating to %d",
+                      stem, length(F_list), nrow(df_breaks), n_use))
+    }
+
+    distances <- vapply(
+      F_list[seq_len(n_use)],
+      function(Fmat) dist_d1(Fmat, F_mean_neutral),
+      numeric(1)
+    )
+
+    results[[i]] <- tibble(
+      scenario = scenario_tag,
+      file = df_breaks$file[seq_len(n_use)],
+      tree_index = df_breaks$tree_index[seq_len(n_use)],
+      left = df_breaks$left[seq_len(n_use)],
+      right = df_breaks$right[seq_len(n_use)],
+      mid = df_breaks$mid[seq_len(n_use)],
+      distance = distances
+    )
+  }
+
+  bind_rows(results)
+}
+```
+
+## Compute distances for new scenarios
+
+```{r}
+out_dir <- "../dists_all_2"
+dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
+
+# --- Neutral: last 250 simulations -----------------------------------------
+neutral_fs_dir <- file.path(data_dir, "Fs_nested_neutrals_r400")
+neutral_files <- sort(list.files(neutral_fs_dir, pattern = "\\.rds$", full.names = TRUE))
+if (length(neutral_files) == 0L) stop("Missing neutral Fs in ", neutral_fs_dir)
+
+n_total_neutral <- length(neutral_files)
+start_idx <- max(1L, n_total_neutral - 250L + 1L)
+neutral_last_250_files <- neutral_files[start_idx:n_total_neutral]
+
+neutral_tag <- "Neutral_last_250"
+neutral_df <- distances_with_positions_from_files(
+  neutral_last_250_files,
+  breaks_dir,
+  neutral_tag,
+  show_progress = TRUE
+)
+
+neutral_out <- file.path(out_dir, "dist_all_new_neutral_last250.csv")
+write.csv(neutral_df, neutral_out, row.names = FALSE)
+message("Wrote: ", neutral_out, " (n=", nrow(neutral_df), ")")
+```
+
+```{r}
+scenario_dirs <- list(
+  "s=0.01F=0.25" = file.path(data_dir, "Fs_nested_selectives_r404"),
+  "s=0.01F=0.5"  = file.path(data_dir, "Fs_nested_selectives_r405"),
+  "s=0.01F=0.75" = file.path(data_dir, "Fs_nested_selectives_r406")
+)
+
+all_results <- list()
+
+for (scenario_tag in names(scenario_dirs)) {
+  fs_dir <- scenario_dirs[[scenario_tag]]
+  fs_files <- sort(list.files(fs_dir, pattern = "\\.rds$", full.names = TRUE))
+  if (length(fs_files) == 0L) {
+    message("Skipping ", scenario_tag, " (missing Fs in ", fs_dir, ")")
+    next
+  }
+
+  message("Processing ", scenario_tag, " ...")
+  df_dist <- distances_with_positions_from_files(fs_files, breaks_dir, scenario_tag, show_progress = TRUE)
+  message("Finished ", scenario_tag, " (n=", nrow(df_dist), ")")
+  all_results[[scenario_tag]] <- df_dist
+
+  out_csv <- file.path(out_dir, sprintf("dist_all_new_%s.csv", scenario_tag))
+  write.csv(df_dist, out_csv, row.names = FALSE)
+  message("Wrote: ", out_csv, " (n=", nrow(df_dist), ")")
+}
+
+all_distances <- bind_rows(all_results)
+write.csv(all_distances, file.path(out_dir, "dist_all_new_all_scenarios.csv"), row.names = FALSE)
+```

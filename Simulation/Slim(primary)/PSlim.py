@@ -36,7 +36,8 @@ def get_simIDs(cID, setID, nrep):
     """
     if any([cID > 9, setID > 99, nrep > 10000]):
         raise ValueError('Wrong IDs')
-    start = cID * 1_000_000 + setID * 10_000
+    # start = cID * 1_000_000 + setID * 10_000
+    start = 4060250
     ids = np.arange(start, start + nrep)
 
     setID_str = str(setID)

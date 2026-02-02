@@ -47,13 +47,17 @@ neutrals[[i]][[j]] gives the jth tree from the ith simulation under the given sc
 
 ```{r}
 # --- Define filename prefixes ----------------------------------------------
-neutral_prefix   <- "^r300.*\\.tree$"
+# neutral_prefix   <- "^r300.*\\.tree$"
+neutral_prefix   <- "^r400.*\\.tree$"
 selective_s0.02_f0.25_prefix <- "^r301.*\\.tree$"
 selective_s0.02_f0.5_prefix  <- "^r302.*\\.tree$"
 selective_s0.02_f0.75_prefix <- "^r303.*\\.tree$"
-selective_s0.01_f0.25_prefix <- "^r304.*\\.tree$"
-selective_s0.01_f0.5_prefix  <- "^r305.*\\.tree$"
-selective_s0.01_f0.75_prefix <- "^r306.*\\.tree$"
+# selective_s0.01_f0.25_prefix <- "^r304.*\\.tree$"
+# selective_s0.01_f0.5_prefix  <- "^r305.*\\.tree$"
+# selective_s0.01_f0.75_prefix <- "^r306.*\\.tree$"
+selective_s0.01_f0.25_prefix <- "^r404.*\\.tree$"
+selective_s0.01_f0.5_prefix  <- "^r405.*\\.tree$"
+selective_s0.01_f0.75_prefix <- "^r406.*\\.tree$"
 selective_s0.003_f0.25_prefix <- "^r307.*\\.tree$"
 selective_s0.003_f0.5_prefix  <- "^r308.*\\.tree$"
 selective_s0.003_f0.75_prefix <- "^r309.*\\.tree$"
@@ -69,8 +73,8 @@ read_and_save <- function(pattern_name, prefix) {
   #   saveRDS(obj, file = file.path("data", paste0(pattern_name, ".rds")))
   # cat("  Saved ->", file.path("data", paste0(pattern_name, ".rds")), "\n\n")
   
-    saveRDS(obj, file = file.path("data", paste0(pattern_name, ".rds")))
-  cat("  Saved ->", file.path("data", paste0(pattern_name, ".rds")), "\n\n")
+  saveRDS(obj, file = file.path("data2", paste0(pattern_name, ".rds")))
+  cat("  Saved ->", file.path("data2", paste0(pattern_name, ".rds")), "\n\n")
   
   return(obj)
 }
@@ -78,21 +82,21 @@ read_and_save <- function(pattern_name, prefix) {
 # --- Load and save data -----------------------------------------------------
 neutrals <- read_and_save("neutrals", neutral_prefix)
 
-selectives_s0.02_f0.25 <- read_and_save("selectives_s0.02_f0.25", selective_s0.02_f0.25_prefix)
-selectives_s0.02_f0.5  <- read_and_save("selectives_s0.02_f0.5",  selective_s0.02_f0.5_prefix)
-selectives_s0.02_f0.75 <- read_and_save("selectives_s0.02_f0.75", selective_s0.02_f0.75_prefix)
-
-selectives_s0.01_f0.25 <- read_and_save("selectives_s0.01_f0.25", selective_s0.01_f0.25_prefix)
-selectives_s0.01_f0.5  <- read_and_save("selectives_s0.01_f0.5",  selective_s0.01_f0.5_prefix)
-selectives_s0.01_f0.75 <- read_and_save("selectives_s0.01_f0.75", selective_s0.01_f0.75_prefix)
-
-selectives_s0.003_f0.25 <- read_and_save("selectives_s0.003_f0.25", selective_s0.003_f0.25_prefix)
-selectives_s0.003_f0.5  <- read_and_save("selectives_s0.003_f0.5",  selective_s0.003_f0.5_prefix)
-selectives_s0.003_f0.75 <- read_and_save("selectives_s0.003_f0.75", selective_s0.003_f0.75_prefix)
-
-selectives_s0.001_f0.25 <- read_and_save("selectives_s0.001_f0.25", selective_s0.001_f0.25_prefix)
-selectives_s0.001_f0.5  <- read_and_save("selectives_s0.001_f0.5",  selective_s0.001_f0.5_prefix)
-selectives_s0.001_f0.75 <- read_and_save("selectives_s0.001_f0.75", selective_s0.001_f0.75_prefix)
+# selectives_s0.02_f0.25 <- read_and_save("selectives_s0.02_f0.25", selective_s0.02_f0.25_prefix)
+# selectives_s0.02_f0.5  <- read_and_save("selectives_s0.02_f0.5",  selective_s0.02_f0.5_prefix)
+# selectives_s0.02_f0.75 <- read_and_save("selectives_s0.02_f0.75", selective_s0.02_f0.75_prefix)
+# 
+# selectives_s0.01_f0.25 <- read_and_save("selectives_s0.01_f0.25", selective_s0.01_f0.25_prefix)
+# selectives_s0.01_f0.5  <- read_and_save("selectives_s0.01_f0.5",  selective_s0.01_f0.5_prefix)
+# selectives_s0.01_f0.75 <- read_and_save("selectives_s0.01_f0.75", selective_s0.01_f0.75_prefix)
+# 
+# selectives_s0.003_f0.25 <- read_and_save("selectives_s0.003_f0.25", selective_s0.003_f0.25_prefix)
+# selectives_s0.003_f0.5  <- read_and_save("selectives_s0.003_f0.5",  selective_s0.003_f0.5_prefix)
+# selectives_s0.003_f0.75 <- read_and_save("selectives_s0.003_f0.75", selective_s0.003_f0.75_prefix)
+# 
+# selectives_s0.001_f0.25 <- read_and_save("selectives_s0.001_f0.25", selective_s0.001_f0.25_prefix)
+# selectives_s0.001_f0.5  <- read_and_save("selectives_s0.001_f0.5",  selective_s0.001_f0.5_prefix)
+# selectives_s0.001_f0.75 <- read_and_save("selectives_s0.001_f0.75", selective_s0.001_f0.75_prefix)
 
 # --- Summary ---------------------------------------------------------------
 cat("Neutral files   :", length(neutrals), "\n")
@@ -108,7 +112,7 @@ Fs is a large list of all f-matrices.
 
 ```{r}
 # --- Example -----------------------------------------------------------------
-Fs_neutrals <- compute_and_save_Fs_nested(neutrals, "neutrals", out_dir = "data")
+Fs_neutrals <- compute_and_save_Fs_nested(neutrals, "neutrals", out_dir = "data2")
 Fs_s0.02_f0.25 <- compute_and_save_Fs_nested(selectives_s0.02_f0.25, "selectives_s0.02_f0.25", out_dir = "data")
 Fs_s0.02_f0.5  <- compute_and_save_Fs_nested(selectives_s0.02_f0.5,  "selectives_s0.02_f0.5", out_dir = "data")
 Fs_s0.02_f0.75 <- compute_and_save_Fs_nested(selectives_s0.02_f0.75, "selectives_s0.02_f0.75", out_dir = "data")

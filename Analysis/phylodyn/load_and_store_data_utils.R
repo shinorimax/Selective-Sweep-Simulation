@@ -2,17 +2,83 @@ library(phylodyn)
 
 # Read all files matching a regex pattern; return a named list of 'multiPhylo'
 # (If a file has a single tree, we wrap it into a multiPhylo of length 1)
-read_files_by_pattern <- function(dir, pattern) {
-  files <- list.files(dir, pattern = pattern, full.names = TRUE)
+# read_files_by_pattern <- function(dir, pattern) {
+#   files <- list.files(dir, pattern = pattern, full.names = TRUE)
+#   files <- sort(files)
+#   out <- lapply(files, function(f) {
+#     tr <- read.tree(f)                         # phylo or multiPhylo
+#     if (inherits(tr, "phylo")) {
+#       tr <- structure(list(tr), class = "multiPhylo")
+#     }
+#     tr
+#   })
+#   names(out) <- basename(files)
+#   out
+# }
+
+read_files_by_pattern <- function(dir, pattern,
+                                  recursive = FALSE,
+                                  full.names = TRUE,
+                                  progress = TRUE,
+                                  verbose_every = 0L,   # e.g., 50 to print every 50 files; 0 disables
+                                  fail = c("warn", "stop", "skip"),
+                                  ...) {
+  fail <- match.arg(fail)
+  
+  files <- list.files(dir, pattern = pattern, full.names = full.names, recursive = recursive)
   files <- sort(files)
-  out <- lapply(files, function(f) {
-    tr <- read.tree(f)                         # phylo or multiPhylo
+  
+  n <- length(files)
+  if (n == 0L) {
+    warning("No files matched pattern in dir.")
+    return(list())
+  }
+  
+  pb <- NULL
+  if (isTRUE(progress)) {
+    pb <- utils::txtProgressBar(min = 0, max = n, style = 3)
+    on.exit(try(close(pb), silent = TRUE), add = TRUE)
+  }
+  
+  out <- vector("list", n)
+  names(out) <- basename(files)
+  
+  for (i in seq_along(files)) {
+    f <- files[[i]]
+    
+    if (!is.null(pb)) utils::setTxtProgressBar(pb, i)
+    if (verbose_every > 0L && (i %% verbose_every == 0L)) {
+      message(sprintf("[%d/%d] %s", i, n, basename(f)))
+    }
+    
+    tr <- tryCatch(
+      ape::read.tree(f, ...),
+      error = function(e) e
+    )
+    
+    if (inherits(tr, "error")) {
+      msg <- sprintf("Failed to read %s: %s", basename(f), tr$message)
+      if (fail == "stop") stop(msg)
+      if (fail == "warn") warning(msg)
+      out[[i]] <- NULL
+      next
+    }
+    
+    # Ensure multiPhylo (even if file has a single tree)
     if (inherits(tr, "phylo")) {
       tr <- structure(list(tr), class = "multiPhylo")
+    } else if (!inherits(tr, "multiPhylo")) {
+      # Unexpected type from read.tree; handle conservatively
+      msg <- sprintf("Unexpected object type from %s: %s", basename(f), paste(class(tr), collapse = ","))
+      if (fail == "stop") stop(msg)
+      if (fail == "warn") warning(msg)
+      out[[i]] <- NULL
+      next
     }
-    tr
-  })
-  names(out) <- basename(files)
+    
+    out[[i]] <- tr
+  }
+  
   out
 }
 
