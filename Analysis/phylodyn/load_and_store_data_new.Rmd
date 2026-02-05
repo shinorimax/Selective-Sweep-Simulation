@@ -1,0 +1,128 @@
+---
+title: "load_and_store_data_new"
+author: "Shinnosuke Yagi"
+date: "2026-01-26"
+output: html_document
+---
+
+## Overview
+
+This script is a streamlined, memory-conscious variant of `load_and_store_data.Rmd`.
+It only processes scenarios **r400, r404, r405, r406**, computes **F-matrices** and
+**chromosome-wide weighted-average F-matrices**, and stores outputs in `data2/`.
+No FW matrices are computed.
+
+## Setup
+
+```{r, message=FALSE}
+library(ape)
+library(readr)
+library(dplyr)
+library(stringr)
+library(purrr)
+library(phylodyn)
+library(future.apply)
+library(progressr)
+
+source("load_and_store_data_new.R")
+
+# --- Paths ---
+# Directory containing *.tree and *_breaks.csv files
+breaks_dir <- "../../Simulation/Slim(primary)/trees_newick"
+
+# Output directory for results
+out_dir <- "data2"
+if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+
+# Parallel settings (adjust as needed)
+use_parallel <- TRUE
+# physical cores (better than logical for R multisession)
+pc <- parallel::detectCores(logical = FALSE)
+pc
+n_workers <- max(1, min(pc - 1, 6))
+
+# Configure future plan once for the session
+if (use_parallel) {
+  future::plan(future::multisession, workers = n_workers)
+}
+```
+
+## Define scenarios
+
+```{r}
+# Scenario patterns (only these are processed)
+patterns <- list(
+  neutrals_r400       = "^r400.*\\.tree$",
+  selectives_r404     = "^r404.*\\.tree$",
+  selectives_r405     = "^r405.*\\.tree$",
+  selectives_r406     = "^r406.*\\.tree$"
+)
+```
+
+## Process scenarios
+
+```{r}
+# The function below processes one pattern at a time:
+# - Reads each .tree file independently (no giant in-memory list)
+# - Computes F-matrices for that file
+# - Computes chromosome-wide weighted-average F
+# - Saves both to data2/
+
+results <- purrr::imap(patterns, function(pat, name) {
+  cat("\n=== Processing:", name, "===\n")
+  process_pattern_to_Fs(
+    pattern = pat,
+    data_dir = breaks_dir,
+    out_dir = out_dir,
+    scenario_name = name,
+    use_parallel = use_parallel,
+    n_workers = n_workers,
+    show_tree_progress = FALSE,
+    show_file_progress = TRUE
+  )
+})
+
+# results is a named list of summaries for each scenario
+results
+```
+
+## Empirical mean tree (neutral, first 250 weighted-average trees)
+
+```{r}
+# Compute the average F-matrix from the first 250 neutral weighted-average Fs
+neutral_weighted_path <- file.path(out_dir, "F_weighted_average_neutrals_r400.rds")
+neutral_weighted_list <- readRDS(neutral_weighted_path)
+
+target_n <- 250L
+count <- 0L
+F_sum <- NULL
+
+for (F in neutral_weighted_list) {
+  if (is.null(F)) next
+  if (is.null(F_sum)) {
+    F_sum <- matrix(0, nrow = nrow(F), ncol = ncol(F))
+  }
+  F_sum <- F_sum + F
+  count <- count + 1L
+  if (count >= target_n) break
+}
+
+if (count == 0L) {
+  stop("No neutral weighted-average F-matrices found in ", neutral_weighted_path)
+}
+if (count < target_n) {
+  warning("Only ", count, " neutral weighted-average F-matrices found; averaging available matrices.")
+}
+
+F_empirical_mean <- F_sum / count
+mean_path <- file.path(out_dir, "F_empirical_mean_neutrals_r400_first250.rds")
+saveRDS(F_empirical_mean, mean_path)
+cat("Saved empirical mean F-matrix ->", mean_path, "\n")
+```
+
+## Notes
+
+- Each `.tree` file is processed in isolation to avoid huge memory usage.
+- Per-file F-matrices are saved in `data2/Fs_nested_<scenario>/<file>.rds`.
+- Weighted-average F matrices are stored as a single list per scenario:
+  `data2/F_weighted_average_<scenario>.rds`.

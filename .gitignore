@@ -48,6 +48,8 @@ Analysis/phylodyn/*
 !Analysis/phylodyn/dist_all.Rmd
 !Analysis/phylodyn/dist_all_new.Rmd
 !Analysis/phylodyn/load_and_store_data.Rmd
+!Analysis/phylodyn/load_and_store_data_new.R
+!Analysis/phylodyn/load_and_store_data_new.Rmd
 Analysis/phylodyn/data/
 Analysis/phylodyn/data2/
 Analysis/changepoint_outputs/
