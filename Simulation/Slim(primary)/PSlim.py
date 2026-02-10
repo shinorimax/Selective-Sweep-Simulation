@@ -1,4 +1,5 @@
 import os, re, sys, json, subprocess, time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import numpy as np
 import pandas as pd
 import tskit
@@ -36,7 +37,7 @@ def get_simIDs(cID, setID, nrep):
     """
     if any([cID > 9, setID > 99, nrep > 10000]):
         raise ValueError('Wrong IDs')
-    # start = cID * 1_000_000 + setID * 10_000
+    # start = cID * 1_000_000 + (setID + 4) * 10_000
     start = 4060250
     ids = np.arange(start, start + nrep)
 
@@ -297,17 +298,54 @@ class Experiment:
         self.AFS = {sid: np.zeros(Args[sid]['N'] - 1, dtype='int') for sid in setids}
 
     def sim(self):
+        # setids = self.setids
+        # simIDs = self.simIDs
+        # simJobs = {}
+        # for setid in setids:
+        #     print(f"running setid: {setid}")
+        #     pslim = PSlim(self.Args[setid])
+        #     print(f"pslim set up for {setid}")
+        #     simJobs[setid] = []
+        #     for simID in simIDs[setid]:
+        #         simJobs[setid].append(pslim.sim(simID))
+        #         print(f"simID: {simID} done")
+        # self.simJobs = simJobs
+        # print('If you are using HPC (srun is not None) check the jobs!')
+
         setids = self.setids
         simIDs = self.simIDs
         simJobs = {}
+
+        cpu = os.cpu_count() or 1
+        max_workers = max(1, cpu // 2)
+
         for setid in setids:
             print(f"running setid: {setid}")
             pslim = PSlim(self.Args[setid])
             print(f"pslim set up for {setid}")
             simJobs[setid] = []
-            for simID in simIDs[setid]:
-                simJobs[setid].append(pslim.sim(simID))
-                print(f"simID: {simID} done")
+
+            ids = list(simIDs[setid])
+            if not ids:
+                continue
+
+            workers = min(max_workers, len(ids))
+            print(f"parallel workers for {setid}: {workers}")
+            total = len(ids)
+            completed = 0
+
+            with ThreadPoolExecutor(max_workers=workers) as ex:
+                future_to_id = {ex.submit(pslim.sim, simID): simID for simID in ids}
+                for fut in as_completed(future_to_id):
+                    simID = future_to_id[fut]
+                    try:
+                        simJobs[setid].append(fut.result())
+                        completed += 1
+                        print(f"simID: {simID} done ({completed}/{total})")
+                    except Exception as e:
+                        print(f"[error] simID: {simID} failed: {e}")
+                        raise
+
         self.simJobs = simJobs
         print('If you are using HPC (srun is not None) check the jobs!')
 

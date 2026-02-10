@@ -14,15 +14,59 @@ No FW matrices are computed.
 
 ## Setup
 
+```{r}
+# # if phylodyn is attached
+# if ("package:phylodyn" %in% search()) detach("package:phylodyn", unload = TRUE)
+# 
+# # also try unloading the namespace (in case it was imported but not attached)
+# if ("phylodyn" %in% loadedNamespaces()) unloadNamespace("phylodyn")
+# 
+# remove.packages("phylodyn")
+```
+
 ```{r, message=FALSE}
+# One-time installs for phylodyn and dependencies
+install.packages(c("ape", "spam", "devtools"))
+# install.packages(
+#   "INLA",
+#   repos = c(getOption("repos"), INLA = "https://inla.r-inla-download.org/R/stable"),
+#   dep = TRUE
+# )
+
+library(devtools)
+install.packages("expm")
+install_github("JuliaPalacios/phylodyn")
+```
+
+```{r, message=FALSE}
+pkgs <- c(
+  "ape",
+  "spam",
+  "readr",
+  "dplyr",
+  "stringr",
+  "purrr",
+  "phylodyn",
+  "future.apply",
+  "progressr",
+  "future"
+)
+to_install <- setdiff(pkgs, rownames(installed.packages()))
+if (length(to_install) > 0) {
+  install.packages(to_install)
+}
+
 library(ape)
 library(readr)
 library(dplyr)
 library(stringr)
 library(purrr)
+library(devtools)
+# install_github("JuliaPalacios/phylodyn")
 library(phylodyn)
 library(future.apply)
 library(progressr)
+library(future)
 
 source("load_and_store_data_new.R")
 
@@ -39,7 +83,7 @@ use_parallel <- TRUE
 # physical cores (better than logical for R multisession)
 pc <- parallel::detectCores(logical = FALSE)
 pc
-n_workers <- max(1, min(pc - 1, 6))
+n_workers <- max(1L, floor(min(pc - 1, 32) / 2))
 
 # Configure future plan once for the session
 if (use_parallel) {

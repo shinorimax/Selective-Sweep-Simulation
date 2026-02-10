@@ -1,3 +1,5 @@
+library(devtools)
+# install_github("JuliaPalacios/phylodyn")
 library(phylodyn)
 library(future.apply)
 
