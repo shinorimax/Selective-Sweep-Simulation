@@ -9,9 +9,11 @@
 *.vcf
 *.vcf.gz
 *.npz
+*.tsz
+*.tree
+*.trees
 
 # Top-level folders
-1000genomes/
 argweaver/
 Images/
 Results/

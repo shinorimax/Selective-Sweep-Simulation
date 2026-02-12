@@ -1,3 +1,4 @@
+
 # Selective Sweep Simulation
 
 This repository contains all scripts and configurations used to simulate genealogies under selection, infer tree-based statistics, and analyze signals of natural selection using tree imbalance and pairwise distance metrics.  

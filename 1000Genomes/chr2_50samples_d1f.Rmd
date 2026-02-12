@@ -1,0 +1,128 @@
+---
+title: "chr2_50samples D1F"
+author: "Codex"
+date: "2026-02-12"
+output: html_document
+---
+
+## Overview
+
+This notebook computes per-tree **D1F** distances for multiple populations:
+**CER, GBR, TSI, JPT**.
+
+Pipeline:
+1. Use pre-generated Newick (`.tree`) plus interval CSV (`_breaks.csv`) from `1000Genomes/load_1kg_tsz.ipynb`.
+2. Load each tree and compute its F-matrix with `phylodyn::gen_Fmat`.
+3. Build a Kingman `n=50` theoretical-mean proxy tree using expected coalescent waiting times and compute its F-matrix.
+4. Compute per-tree `D1F = sum(abs(F_tree - F_mean_kingman))` and save results per population.
+
+## Setup
+
+```{r, message=FALSE}
+library(ape)
+library(phylodyn)
+library(readr)
+library(dplyr)
+library(purrr)
+library(fmatrix)
+library(progress)
+
+options(stringsAsFactors = FALSE)
+```
+
+```{r}
+base_dir <- normalizePath(".", winslash = "/", mustWork = TRUE)
+
+trees_dir <- file.path(base_dir, "trees")
+results_dir <- file.path(base_dir, "results")
+
+target_pops <- c("CEU", "GBR", "TSI", "JPT", "KHV", "CHB")
+
+out_mean_rds <- file.path(results_dir, "F_mean_kingman_n50_proxy.rds")
+```
+
+## Kingman `n=50` theoretical-mean proxy tree and F-matrix
+
+```{r}
+F_mean_kingman <- fmatrix::kingman_m(n = 50L)
+saveRDS(F_mean_kingman, out_mean_rds)
+
+cat("Saved Kingman mean proxy F-matrix:", out_mean_rds, "
+")
+```
+
+## Compute per-tree F-matrices and D1F distances (per population)
+
+```{r}
+dist_d1 <- function(F1, F2) {
+  sum(abs(F1 - F2))
+}
+
+process_pop <- function(pop) {
+  input_trees <- file.path(trees_dir, sprintf("chr2_50samples_%s.trees", pop))
+  newick_path <- file.path(trees_dir, sprintf("chr2_50samples_%s.tree", pop))
+  breaks_path <- file.path(results_dir, sprintf("chr2_50samples_%s_breaks.csv", pop))
+  out_csv <- file.path(results_dir, sprintf("chr2_50samples_%s_d1f_per_tree.csv", pop))
+
+  stopifnot(file.exists(input_trees))
+  stopifnot(file.exists(newick_path))
+  stopifnot(file.exists(breaks_path))
+
+  trees <- ape::read.tree(newick_path)
+  if (inherits(trees, "phylo")) {
+    trees <- structure(list(trees), class = "multiPhylo")
+  }
+
+  breaks_df <- readr::read_csv(breaks_path, show_col_types = FALSE) %>%
+    arrange(tree_index)
+
+  cat("Population:", pop, "
+")
+  cat("Trees loaded:", length(trees), "
+")
+  cat("Break rows   :", nrow(breaks_df), "
+")
+
+  n_trees <- length(trees)
+
+  pb <- progress::progress_bar$new(
+    format = sprintf("Computing D1F (%s) [:bar] :current/:total (:percent) eta=:eta", pop),
+    total = n_trees,
+    clear = FALSE,
+    width = 60
+  )
+
+  d1f_vals <- vapply(seq_len(n_trees), function(i) {
+    pb$tick()
+    Fm <- phylodyn::gen_Fmat(trees[[i]], tol = 8L)
+    dist_d1(Fm, F_mean_kingman)
+  }, numeric(1))
+
+  n_use <- min(length(d1f_vals), nrow(breaks_df))
+  if (length(d1f_vals) != nrow(breaks_df)) {
+    warning(sprintf(
+      "Length mismatch for %s (trees=%d, breaks=%d). Truncating to %d.",
+      pop, length(d1f_vals), nrow(breaks_df), n_use
+    ))
+  }
+
+  results <- tibble::tibble(
+    file = breaks_df$file[seq_len(n_use)],
+    tree_index = breaks_df$tree_index[seq_len(n_use)],
+    left = breaks_df$left[seq_len(n_use)],
+    right = breaks_df$right[seq_len(n_use)],
+    mid = breaks_df$mid[seq_len(n_use)],
+    d1f_distance = d1f_vals[seq_len(n_use)]
+  )
+
+  readr::write_csv(results, out_csv)
+  cat("Saved per-tree D1F:", out_csv, "
+
+")
+
+  invisible(results)
+}
+
+results_list <- lapply(target_pops, process_pop)
+```
+
