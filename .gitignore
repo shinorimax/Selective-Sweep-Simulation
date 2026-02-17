@@ -7,11 +7,18 @@
 
 # Data files
 *.vcf
-*.vcf.gz
+*.gz
 *.npz
 *.tsz
 *.tree
 *.trees
+*.tbi
+*.stats
+*.log
+*.sites
+*.panel
+*.tar
+*.bedgraph
 
 # Top-level folders
 argweaver/
