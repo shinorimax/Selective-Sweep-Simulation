@@ -213,7 +213,9 @@ process_run <- function(run_dir, run_tag, pop) {
 
   dplyr::bind_rows(all_results)
 }
+```
 
+```{r}
 all_d1f <- purrr::pmap_dfr(
   list(run_table$run_dir, run_table$run_tag, run_table$pop),
   process_run
@@ -255,5 +257,371 @@ if (nrow(all_d1f) > 0) {
     arrange(population, sample)
 
   print(summary_tbl, n = 200)
+}
+```
+
+## Empirical Neutral Reference (Weighted Mean F) and D1F
+
+```{r}
+# -----------------------------------------------------------------------------
+# Empirical neutral reference construction (population-specific)
+# -----------------------------------------------------------------------------
+
+# Expected layout for neutral ARGweaver runs inferred from neutral SLiM data:
+# raw_data/data/runs_neutral_slim_argweaver/
+#   argweaver_<ANYTAG>_<POP>20[_neutral...]/trees/*.tree
+# and matching breakpoints in:
+# raw_data/data/results/<ANYTAG>_<POP>20[_neutral...]/breakpoints/*_breaks.csv
+
+neutral_runs_root <- file.path(data_root, "runs_neutral_slim_argweaver")
+if (!dir.exists(neutral_runs_root)) {
+  stop("Missing neutral run root: ", neutral_runs_root,
+       "\nCreate this directory with ARGweaver outputs inferred from neutral SLiM simulations.")
+}
+
+dist_d1 <- function(F1, F2) {
+  sum(abs(F1 - F2))
+}
+
+break_coalescent_ties_local <- function(tr, eps = 1e-8) {
+  n <- tr$Nnode + 1L
+  depths <- ape::node.depth.edgelength(tr)
+  ages <- max(depths) - depths
+  int <- (n + 1):(n + tr$Nnode)
+  a <- ages[int]
+
+  o <- order(a)
+  a_sorted <- a[o]
+  for (i in 2:length(a_sorted)) {
+    if (a_sorted[i] <= a_sorted[i - 1]) a_sorted[i] <- a_sorted[i - 1] + eps
+  }
+  a[o] <- a_sorted
+  ages[int] <- a
+
+  new_depths <- max(ages) - ages
+  parent <- tr$edge[, 1]
+  child <- tr$edge[, 2]
+  bl <- pmax(new_depths[child] - new_depths[parent], eps)
+  tr$edge.length <- bl
+  tr
+}
+
+safe_gen_fmat <- function(tr, tol = 8L, target_dim = target_f_dim) {
+  # Attempt 1: direct
+  out <- tryCatch(
+    {
+      Fm <- phylodyn::gen_Fmat(tr, tol = tol)
+      conform_fmat(Fm, target_dim = target_dim)
+    },
+    error = function(e) NULL
+  )
+  if (!is.null(out)) return(out)
+
+  # Attempt 2: resolve multifurcations + ties
+  tr2 <- tryCatch(ape::multi2di(tr), error = function(e) tr)
+  tr2 <- break_coalescent_ties_local(tr2, eps = 1e-8)
+  out <- tryCatch(
+    {
+      Fm <- phylodyn::gen_Fmat(tr2, tol = tol)
+      conform_fmat(Fm, target_dim = target_dim)
+    },
+    error = function(e) NULL
+  )
+  out
+}
+
+compute_weighted_F_from_treefile <- function(tree_path, breaks_path, target_dim = target_f_dim) {
+  trees <- ape::read.tree(tree_path)
+  if (inherits(trees, "phylo")) {
+    trees <- structure(list(trees), class = "multiPhylo")
+  }
+
+  breaks_df <- readr::read_csv(breaks_path, show_col_types = FALSE) %>%
+    arrange(tree_index)
+
+  n_trees <- length(trees)
+  n_use <- min(n_trees, nrow(breaks_df))
+  if (n_use == 0) return(NULL)
+
+  widths <- breaks_df$right[seq_len(n_use)] - breaks_df$left[seq_len(n_use)]
+  if (sum(widths) <= 0) return(NULL)
+
+  F_list <- vector("list", n_use)
+  for (i in seq_len(n_use)) {
+    Fm <- safe_gen_fmat(trees[[i]], tol = 8L, target_dim = target_dim)
+    if (is.null(Fm)) next
+    F_list[[i]] <- Fm
+  }
+
+  keep <- which(!vapply(F_list, is.null, logical(1)))
+  if (length(keep) == 0) return(NULL)
+  F_list <- F_list[keep]
+  widths <- widths[keep]
+
+  F_sum <- matrix(0, nrow = target_dim, ncol = target_dim)
+  for (i in seq_along(F_list)) {
+    F_sum <- F_sum + widths[i] * F_list[[i]]
+  }
+
+  F_sum / sum(widths)
+}
+
+build_empirical_reference_for_pop <- function(pop, burn_cutoff = burn_in_max) {
+  neutral_run_dirs <- list.dirs(neutral_runs_root, recursive = FALSE, full.names = TRUE)
+  neutral_run_dirs <- neutral_run_dirs[grepl("^argweaver_", basename(neutral_run_dirs))]
+  neutral_run_dirs <- neutral_run_dirs[
+    grepl(pop, basename(neutral_run_dirs), ignore.case = TRUE) &
+      grepl("neutral", basename(neutral_run_dirs), ignore.case = TRUE)
+  ]
+
+  if (length(neutral_run_dirs) == 0) {
+    stop("No neutral run dirs found for population ", pop,
+         " under ", neutral_runs_root,
+         " (expected names containing both population code and 'neutral').")
+  }
+
+  pb_runs <- progress::progress_bar$new(
+    format = sprintf("Empirical ref (%s) runs [:bar] :current/:total (:percent) eta=:eta", pop),
+    total = length(neutral_run_dirs),
+    clear = FALSE,
+    width = 70
+  )
+
+  weighted_list <- list()
+  for (run_dir in neutral_run_dirs) {
+    pb_runs$tick()
+    run_tag <- sub("^argweaver_", "", basename(run_dir))
+    trees_dir <- file.path(run_dir, "trees")
+    breaks_dir <- file.path(results_root, run_tag, "breakpoints")
+
+    if (!dir.exists(trees_dir) || !dir.exists(breaks_dir)) {
+      warning("Skipping neutral run (missing trees or breakpoints): ", run_dir)
+      next
+    }
+
+    tree_files <- list.files(trees_dir, pattern = "_sample[0-9]+\\.tree$", full.names = TRUE)
+    if (length(tree_files) == 0) next
+
+    manifest <- tibble(
+      tree_path = tree_files,
+      stem = tools::file_path_sans_ext(basename(tree_files)),
+      sample = as.integer(stringr::str_match(basename(tree_files), "sample([0-9]+)\\.tree$")[, 2]),
+      breaks_path = file.path(
+        breaks_dir,
+        paste0(tools::file_path_sans_ext(basename(tree_files)), "_breaks.csv")
+      )
+    ) %>%
+      filter(!is.na(sample)) %>%
+      filter(sample > burn_cutoff) %>%
+      arrange(sample)
+
+    if (nrow(manifest) == 0) next
+
+    pb_samples <- progress::progress_bar$new(
+      format = sprintf("Empirical ref (%s %s) samples [:bar] :current/:total (:percent) eta=:eta",
+                       pop, run_tag),
+      total = nrow(manifest),
+      clear = FALSE,
+      width = 70
+    )
+
+    for (i in seq_len(nrow(manifest))) {
+      pb_samples$tick()
+      cat(sprintf("Empirical ref input: %s sample=%d\n", run_tag, manifest$sample[i]))
+      if (!file.exists(manifest$breaks_path[i])) next
+      Fw <- compute_weighted_F_from_treefile(
+        tree_path = manifest$tree_path[i],
+        breaks_path = manifest$breaks_path[i],
+        target_dim = target_f_dim
+      )
+      if (!is.null(Fw)) {
+        weighted_list[[length(weighted_list) + 1L]] <- Fw
+      }
+    }
+  }
+
+  if (length(weighted_list) == 0) {
+    stop("No usable neutral weighted F-matrices found for population ", pop)
+  }
+
+  F_ref <- Reduce(`+`, weighted_list) / length(weighted_list)
+
+  out_ref <- file.path(results_root, sprintf("F_empirical_weighted_neutral_%s_n20.rds", pop))
+  saveRDS(F_ref, out_ref)
+  cat("Saved empirical weighted neutral reference:", out_ref,
+      "| n_weighted_samples=", length(weighted_list), "\n")
+
+  F_ref
+}
+
+F_empirical_by_pop <- setNames(vector("list", length(target_pops)), target_pops)
+for (pop in target_pops) {
+  F_empirical_by_pop[[pop]] <- build_empirical_reference_for_pop(pop)
+}
+```
+
+```{r}
+# -----------------------------------------------------------------------------
+# Recompute post-burn-in D1F to empirical neutral reference (population-specific)
+# -----------------------------------------------------------------------------
+
+process_run_empirical <- function(run_dir, run_tag, pop) {
+  trees_dir <- file.path(run_dir, "trees")
+  breaks_dir <- file.path(results_root, run_tag, "breakpoints")
+  out_dir <- file.path(results_root, run_tag, "d1f_postburnin_empirical_neutral")
+  if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+
+  stopifnot(dir.exists(trees_dir))
+  stopifnot(dir.exists(breaks_dir))
+
+  F_ref <- F_empirical_by_pop[[pop]]
+  if (is.null(F_ref)) stop("Missing empirical reference for pop: ", pop)
+
+  tree_files <- list.files(trees_dir, pattern = "_sample[0-9]+\\.tree$", full.names = TRUE)
+  if (length(tree_files) == 0) {
+    warning(sprintf("[%s] No .tree files found in %s", pop, trees_dir))
+    return(tibble())
+  }
+
+  run_manifest <- tibble(
+    tree_path = tree_files,
+    stem = tools::file_path_sans_ext(basename(tree_files)),
+    sample = as.integer(str_match(basename(tree_files), "sample([0-9]+)\\.tree$")[, 2]),
+    breaks_path = file.path(breaks_dir, paste0(tools::file_path_sans_ext(basename(tree_files)), "_breaks.csv"))
+  ) %>%
+    filter(!is.na(sample)) %>%
+    filter(sample > burn_in_max) %>%
+    arrange(sample)
+
+  if (nrow(run_manifest) == 0) {
+    warning(sprintf("[%s] No post-burn-in .tree files (sample > %d) in %s", pop, burn_in_max, trees_dir))
+    return(tibble())
+  }
+
+  missing_breaks <- !file.exists(run_manifest$breaks_path)
+  if (any(missing_breaks)) {
+    warning(sprintf(
+      "[%s] Missing breaks files for %d sample(s). They will be skipped.",
+      pop, sum(missing_breaks)
+    ))
+    run_manifest <- run_manifest[!missing_breaks, , drop = FALSE]
+  }
+
+  if (nrow(run_manifest) == 0) {
+    warning(sprintf("[%s] All post-burn-in samples were skipped due to missing breaks files.", pop))
+    return(tibble())
+  }
+
+  all_results <- vector("list", nrow(run_manifest))
+
+  pb_samples <- progress::progress_bar$new(
+    format = sprintf("D1F empirical (%s %s) samples [:bar] :current/:total (:percent) eta=:eta",
+                     pop, run_tag),
+    total = nrow(run_manifest),
+    clear = FALSE,
+    width = 70
+  )
+
+  for (j in seq_len(nrow(run_manifest))) {
+    pb_samples$tick()
+    tree_path <- run_manifest$tree_path[j]
+    breaks_path <- run_manifest$breaks_path[j]
+    sample <- run_manifest$sample[j]
+    stem <- run_manifest$stem[j]
+
+    trees <- ape::read.tree(tree_path)
+    if (inherits(trees, "phylo")) {
+      trees <- structure(list(trees), class = "multiPhylo")
+    }
+
+    breaks_df <- readr::read_csv(breaks_path, show_col_types = FALSE) %>%
+      arrange(tree_index)
+
+    n_trees <- length(trees)
+    pb_trees <- progress::progress_bar$new(
+      format = sprintf("D1F empirical (%s sample %d) trees [:bar] :current/:total (:percent) eta=:eta",
+                       pop, sample),
+      total = n_trees,
+      clear = FALSE,
+      width = 70
+    )
+
+    d1f_vals <- rep(NA_real_, n_trees)
+    for (i in seq_len(n_trees)) {
+      pb_trees$tick()
+      Fm <- safe_gen_fmat(trees[[i]], tol = 8L, target_dim = target_f_dim)
+      if (is.null(Fm)) next
+      d1f_vals[i] <- dist_d1(Fm, F_ref)
+    }
+
+    n_use <- min(length(d1f_vals), nrow(breaks_df))
+    if (length(d1f_vals) != nrow(breaks_df)) {
+      warning(sprintf(
+        "Length mismatch for %s (trees=%d, breaks=%d). Truncating to %d.",
+        stem, length(d1f_vals), nrow(breaks_df), n_use
+      ))
+    }
+
+    if (all(is.na(d1f_vals[seq_len(n_use)]))) {
+      warning(sprintf("All trees failed F-matrix generation for %s; skipping.", stem))
+      next
+    }
+
+    res <- tibble(
+      population = pop,
+      run_tag = run_tag,
+      sample = sample,
+      file = breaks_df$file[seq_len(n_use)],
+      tree_index = breaks_df$tree_index[seq_len(n_use)],
+      left = breaks_df$left[seq_len(n_use)],
+      right = breaks_df$right[seq_len(n_use)],
+      mid = breaks_df$mid[seq_len(n_use)],
+      d1f_distance = d1f_vals[seq_len(n_use)]
+    )
+
+    out_sample_csv <- file.path(out_dir, sprintf("%s_d1f_per_tree_postburnin_empirical_neutral.csv", stem))
+    readr::write_csv(res, out_sample_csv)
+    cat("Saved:", out_sample_csv, "\n")
+
+    all_results[[j]] <- res
+  }
+
+  dplyr::bind_rows(all_results)
+}
+
+all_d1f_empirical <- purrr::pmap_dfr(
+  list(run_table$run_dir, run_table$run_tag, run_table$pop),
+  process_run_empirical
+)
+
+cat("\nTotal post-burn-in rows (empirical neutral reference):", nrow(all_d1f_empirical), "\n")
+```
+
+```{r}
+# Save per-population aggregated outputs for empirical-reference D1F
+if (nrow(all_d1f_empirical) > 0) {
+  by_pop_emp <- split(all_d1f_empirical, all_d1f_empirical$population)
+  out_pop_dir_emp <- file.path(results_root, "d1f_postburnin_empirical_n20_by_population")
+  if (!dir.exists(out_pop_dir_emp)) dir.create(out_pop_dir_emp, recursive = TRUE)
+
+  for (pop in names(by_pop_emp)) {
+    out_csv <- file.path(out_pop_dir_emp, sprintf("chr2_20samples_%s_d1f_per_tree_postburnin_empirical_neutral.csv", pop))
+    readr::write_csv(by_pop_emp[[pop]], out_csv)
+    cat("Saved aggregated empirical-reference file:", out_csv, "\n")
+  }
+
+  summary_tbl_emp <- all_d1f_empirical %>%
+    group_by(population, sample) %>%
+    summarise(
+      n_trees = n(),
+      mean_d1f = mean(d1f_distance, na.rm = TRUE),
+      median_d1f = median(d1f_distance, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    arrange(population, sample)
+
+  print(summary_tbl_emp, n = 200)
+} else {
+  warning("No empirical-reference D1F rows were produced.")
 }
 ```
