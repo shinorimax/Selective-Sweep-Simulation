@@ -1,0 +1,580 @@
+---
+title: "chr2 52samples vs allpop(2inds) binned D1F"
+author: "Codex"
+date: "2026-03-03"
+output: html_document
+---
+
+## Overview
+
+This notebook computes, for each population and genomic bin, the D1F distance between:
+
+1. A population-specific window-averaged F matrix from `chr2_<num_samples>samples_<POP>` trees.
+2. An all-population window-averaged F matrix from `chr2_2inds_allpops` trees.
+
+Default bin size is 5,000 bp.
+
+## Setup
+
+```{r, message=FALSE}
+library(ape)
+library(phylodyn)
+library(readr)
+library(dplyr)
+library(progress)
+
+options(stringsAsFactors = FALSE)
+```
+
+```{r}
+base_dir <- normalizePath(".", winslash = "/", mustWork = TRUE)
+trees_dir <- file.path(base_dir, "trees")
+results_dir <- file.path(base_dir, "results")
+
+CHR <- 2L
+num_samples <- 52L
+bin_size_bp <- 5000L
+
+target_pops <- c("CEU", "GBR", "TSI", "JPT", "KHV", "CHB")
+pop_tag <- sprintf("%dsamples", as.integer(num_samples))
+
+allpops_stem <- sprintf("chr%d_2inds_allpops", CHR)
+allpops_label <- "allpops_2inds"
+
+cache_dir <- file.path(results_dir, "fmatrix_cache")
+if (!dir.exists(cache_dir)) {
+  dir.create(cache_dir, recursive = TRUE)
+}
+
+allpops_cache_rds <- file.path(
+  cache_dir,
+  sprintf("chr%d_%s_raw_fmats.rds", CHR, allpops_label)
+)
+
+out_csv <- file.path(
+  results_dir,
+  sprintf("chr%d_%s_vs_allpops2inds_d1f_between_pop_binned_bin%d.csv", CHR, pop_tag, as.integer(bin_size_bp))
+)
+
+cat("CHR:", CHR, "| pop_tag:", pop_tag, "| bin_size_bp:", bin_size_bp, "\n")
+cat("Output CSV:", out_csv, "\n")
+cat("Cache dir:", cache_dir, "\n")
+```
+
+## Helpers
+
+```{r}
+dist_d1 <- function(F1, F2) {
+  sum(abs(F1 - F2))
+}
+
+trim_for_target_dim <- function(Fm, target_dim) {
+  if (!is.matrix(Fm)) {
+    stop("Expected F matrix.")
+  }
+
+  nr <- nrow(Fm)
+  nc <- ncol(Fm)
+  if (nr > target_dim || nc > target_dim) {
+    if (nr < target_dim || nc < target_dim) {
+      stop(sprintf(
+        "Cannot trim matrix to %d x %d because current size is %d x %d.",
+        target_dim, target_dim, nr, nc
+      ))
+    }
+    return(Fm[seq_len(target_dim), seq_len(target_dim), drop = FALSE])
+  }
+
+  Fm
+}
+
+load_trees_and_breaks <- function(newick_path, breaks_path, label) {
+  if (!file.exists(newick_path) || !file.exists(breaks_path)) {
+    stop(sprintf("Missing input(s) for %s: %s | %s", label, newick_path, breaks_path))
+  }
+
+  trees <- ape::read.tree(newick_path)
+  if (inherits(trees, "phylo")) {
+    trees <- structure(list(trees), class = "multiPhylo")
+  }
+
+  breaks_df <- readr::read_csv(breaks_path, show_col_types = FALSE) %>%
+    dplyr::arrange(tree_index)
+
+  required <- c("left", "right", "mid")
+  miss <- setdiff(required, names(breaks_df))
+  if (length(miss) > 0) {
+    stop(sprintf("%s missing columns in breaks file: %s", label, paste(miss, collapse = ", ")))
+  }
+
+  n_use <- min(length(trees), nrow(breaks_df))
+  if (n_use == 0) {
+    stop(sprintf("No usable trees/break rows for %s", label))
+  }
+
+  if (length(trees) != nrow(breaks_df)) {
+    warning(sprintf(
+      "Length mismatch for %s (trees=%d, breaks=%d). Truncating to %d.",
+      label, length(trees), nrow(breaks_df), n_use
+    ))
+  }
+
+  left <- as.numeric(breaks_df$left[seq_len(n_use)])
+  right <- as.numeric(breaks_df$right[seq_len(n_use)])
+
+  pb <- progress::progress_bar$new(
+    format = sprintf("Computing F matrices (%s) [:bar] :current/:total (:percent) eta=:eta", label),
+    total = n_use,
+    clear = FALSE,
+    width = 60
+  )
+
+  F_list <- vector("list", n_use)
+  for (i in seq_len(n_use)) {
+    pb$tick()
+    F_list[[i]] <- phylodyn::gen_Fmat(trees[[i]], tol = 8L)
+  }
+
+  list(
+    left = left,
+    right = right,
+    F_list = F_list
+  )
+}
+
+binned_weighted_F <- function(obj, L, R) {
+  overlap <- pmin(obj$right, R) - pmax(obj$left, L)
+  keep <- which(is.finite(overlap) & overlap > 0)
+
+  if (length(keep) == 0) {
+    return(list(F = NULL, weight = 0, n_segments = 0L))
+  }
+
+  w <- overlap[keep]
+  F0 <- obj$F_list[[keep[1]]]
+  F_sum <- matrix(0, nrow = nrow(F0), ncol = ncol(F0))
+
+  for (j in seq_along(keep)) {
+    idx <- keep[j]
+    F_sum <- F_sum + w[j] * obj$F_list[[idx]]
+  }
+
+  list(
+    F = F_sum / sum(w),
+    weight = sum(w),
+    n_segments = as.integer(length(keep))
+  )
+}
+
+binned_weighted_F_details <- function(obj, L, R, target_dim) {
+  overlap <- pmin(obj$right, R) - pmax(obj$left, L)
+  keep <- which(is.finite(overlap) & overlap > 0)
+
+  if (length(keep) == 0) {
+    return(list(
+      F = NULL,
+      weight = 0,
+      n_segments = 0L,
+      keep = integer(0),
+      w = numeric(0)
+    ))
+  }
+
+  w <- as.numeric(overlap[keep])
+  F0 <- trim_for_target_dim(obj$F_list[[keep[1]]], target_dim)
+  F_sum <- matrix(0, nrow = nrow(F0), ncol = ncol(F0))
+
+  for (j in seq_along(keep)) {
+    idx <- keep[j]
+    Fm <- trim_for_target_dim(obj$F_list[[idx]], target_dim)
+    if (nrow(Fm) != nrow(F0) || ncol(Fm) != ncol(F0)) {
+      stop(sprintf(
+        "F dimension mismatch inside a bin: base=%dx%d vs current=%dx%d",
+        nrow(F0), ncol(F0), nrow(Fm), ncol(Fm)
+      ))
+    }
+    F_sum <- F_sum + w[j] * Fm
+  }
+
+  list(
+    F = F_sum / sum(w),
+    weight = sum(w),
+    n_segments = as.integer(length(keep)),
+    keep = keep,
+    w = w
+  )
+}
+
+weighted_mean_distance_to_reference <- function(obj, details, target_dim, F_ref = NULL) {
+  ref_use <- F_ref
+  if (is.null(ref_use)) {
+    ref_use <- details$F
+  }
+
+  if (is.null(ref_use) || length(details$keep) == 0) {
+    return(NA_real_)
+  }
+
+  dvals <- vapply(seq_along(details$keep), function(j) {
+    idx <- details$keep[j]
+    Fm <- trim_for_target_dim(obj$F_list[[idx]], target_dim)
+    if (nrow(Fm) != nrow(ref_use) || ncol(Fm) != ncol(ref_use)) {
+      return(NA_real_)
+    }
+    dist_d1(Fm, ref_use)
+  }, numeric(1))
+
+  ok <- is.finite(dvals) & is.finite(details$w) & (details$w > 0)
+  if (!any(ok)) {
+    return(NA_real_)
+  }
+  stats::weighted.mean(dvals[ok], w = details$w[ok])
+}
+```
+
+## Step 1: Build/cache raw F-matrices for all-population trees
+
+```{r}
+force_recompute_allpops_f <- FALSE
+
+allpops_newick <- file.path(trees_dir, sprintf("%s.tree", allpops_stem))
+allpops_breaks <- file.path(results_dir, sprintf("%s_breaks.csv", allpops_stem))
+
+pb_step1 <- progress::progress_bar$new(
+  format = "Step 1 (allpops cache) [:bar] :current/:total (:percent) eta=:eta",
+  total = 1,
+  clear = FALSE,
+  width = 60
+)
+
+if (!file.exists(allpops_cache_rds) || isTRUE(force_recompute_allpops_f)) {
+  allpops_obj <- load_trees_and_breaks(
+    allpops_newick,
+    allpops_breaks,
+    label = allpops_label
+  )
+  saveRDS(allpops_obj, allpops_cache_rds)
+  cat("Saved allpops raw F-matrix cache:", allpops_cache_rds, "\n")
+} else {
+  cat("Using existing allpops raw F-matrix cache:", allpops_cache_rds, "\n")
+}
+pb_step1$tick()
+```
+
+## Step 2: Build/cache raw F-matrices for each population tree set
+
+```{r}
+force_recompute_pop_f <- FALSE
+
+pb_step2 <- progress::progress_bar$new(
+  format = "Step 2 (population caches) [:bar] :current/:total (:percent) eta=:eta",
+  total = length(target_pops),
+  clear = FALSE,
+  width = 60
+)
+
+for (pop in target_pops) {
+  pop_cache_rds <- file.path(
+    cache_dir,
+    sprintf("chr%d_%s_%s_raw_fmats.rds", CHR, pop_tag, pop)
+  )
+
+  if (file.exists(pop_cache_rds) && !isTRUE(force_recompute_pop_f)) {
+    cat("Using existing population raw F-matrix cache:", pop_cache_rds, "\n")
+    pb_step2$tick()
+    next
+  }
+
+  pop_newick <- file.path(trees_dir, sprintf("chr%d_%s_%s.tree", CHR, pop_tag, pop))
+  pop_breaks <- file.path(results_dir, sprintf("chr%d_%s_%s_breaks.csv", CHR, pop_tag, pop))
+
+  pop_obj <- load_trees_and_breaks(
+    pop_newick,
+    pop_breaks,
+    label = sprintf("%s_%s", pop_tag, pop)
+  )
+  saveRDS(pop_obj, pop_cache_rds)
+  cat("Saved population raw F-matrix cache:", pop_cache_rds, "\n")
+  pb_step2$tick()
+}
+```
+
+## Step 3: Compute per-bin D1F(pop vs allpops) using cached F-matrices
+
+```{r}
+if (!file.exists(allpops_cache_rds)) {
+  stop(sprintf("Missing allpops cache: %s. Run Step 1 first.", allpops_cache_rds))
+}
+allpops_obj <- readRDS(allpops_cache_rds)
+F_DIM_TARGET <- as.integer(num_samples) - 1L
+
+results_all <- list()
+pb_step3 <- progress::progress_bar$new(
+  format = "Step 3 (binned pop-vs-allpops) [:bar] :current/:total (:percent) eta=:eta",
+  total = length(target_pops),
+  clear = FALSE,
+  width = 60
+)
+for (pop in target_pops) {
+  pop_cache_rds <- file.path(
+    cache_dir,
+    sprintf("chr%d_%s_%s_raw_fmats.rds", CHR, pop_tag, pop)
+  )
+  if (!file.exists(pop_cache_rds)) {
+    stop(sprintf("Missing population cache for %s: %s. Run Step 2 first.", pop, pop_cache_rds))
+  }
+  pop_obj <- readRDS(pop_cache_rds)
+
+  x0 <- min(min(pop_obj$left, na.rm = TRUE), min(allpops_obj$left, na.rm = TRUE))
+  x1 <- max(max(pop_obj$right, na.rm = TRUE), max(allpops_obj$right, na.rm = TRUE))
+  x0 <- floor(x0 / bin_size_bp) * bin_size_bp
+  x1 <- ceiling(x1 / bin_size_bp) * bin_size_bp
+
+  bin_edges <- seq(x0, x1, by = bin_size_bp)
+  if (tail(bin_edges, 1) < x1) {
+    bin_edges <- c(bin_edges, x1)
+  }
+
+  bin_left <- bin_edges[-length(bin_edges)]
+  bin_right <- bin_edges[-1]
+  bin_mid <- (bin_left + bin_right) / 2
+
+  pb_bins <- progress::progress_bar$new(
+    format = sprintf("Computing pop-vs-allpops D1F (%s) [:bar] :current/:total (:percent) eta=:eta", pop),
+    total = length(bin_left),
+    clear = FALSE,
+    width = 60
+  )
+
+  pop_bin_rows <- vector("list", length(bin_left))
+  for (i in seq_along(bin_left)) {
+    pb_bins$tick()
+
+    L <- bin_left[i]
+    R <- bin_right[i]
+
+    pop_ref <- binned_weighted_F(pop_obj, L, R)
+    all_ref <- binned_weighted_F(allpops_obj, L, R)
+
+    d_pop_all <- NA_real_
+    if (!is.null(pop_ref$F) && !is.null(all_ref$F)) {
+      F_pop_cmp <- trim_for_target_dim(pop_ref$F, F_DIM_TARGET)
+      F_all_cmp <- trim_for_target_dim(all_ref$F, F_DIM_TARGET)
+
+      if (nrow(F_pop_cmp) == nrow(F_all_cmp) && ncol(F_pop_cmp) == ncol(F_all_cmp)) {
+        d_pop_all <- dist_d1(F_pop_cmp, F_all_cmp)
+      } else {
+        warning(sprintf(
+          "Skipping bin [%g, %g) for %s due to F dimension mismatch after trimming (%dx%d vs %dx%d).",
+          L, R, pop, nrow(F_pop_cmp), ncol(F_pop_cmp), nrow(F_all_cmp), ncol(F_all_cmp)
+        ))
+      }
+    }
+
+    pop_bin_rows[[i]] <- tibble::tibble(
+      chromosome = CHR,
+      population = pop,
+      pop_sample_tag = pop_tag,
+      baseline = allpops_label,
+      bin_size_bp = as.integer(bin_size_bp),
+      bin_left = as.numeric(L),
+      bin_right = as.numeric(R),
+      bin_mid = as.numeric(bin_mid[i]),
+      n_overlap_pop = as.integer(pop_ref$n_segments),
+      n_overlap_allpops = as.integer(all_ref$n_segments),
+      overlap_bp_pop = as.numeric(pop_ref$weight),
+      overlap_bp_allpops = as.numeric(all_ref$weight),
+      d1f_distance_pop_vs_allpops = d_pop_all
+    )
+  }
+
+  results_all[[pop]] <- dplyr::bind_rows(pop_bin_rows)
+  pb_step3$tick()
+}
+
+out_df <- dplyr::bind_rows(results_all)
+readr::write_csv(out_df, out_csv)
+
+cat("Saved binned pop-vs-allpops D1F:", out_csv, "\n")
+print(dplyr::slice_head(out_df, n = 10))
+```
+
+## Step 4: Compute local F_ST^Tree for CEU vs allpops (CEU/JPT-matched workflow)
+
+```{r}
+fst_pop <- "KHV"
+out_fst_local_csv <- file.path(
+  results_dir,
+  sprintf("chr%d_%s_%s_vs_allpops2inds_fst_tree_local_bin%d.csv", CHR, pop_tag, fst_pop, as.integer(bin_size_bp))
+)
+
+if (!file.exists(allpops_cache_rds)) {
+  stop(sprintf("Missing allpops cache: %s. Run Step 1 first.", allpops_cache_rds))
+}
+allpops_obj <- readRDS(allpops_cache_rds)
+
+ceu_cache_rds <- file.path(
+  cache_dir,
+  sprintf("chr%d_%s_%s_raw_fmats.rds", CHR, pop_tag, fst_pop)
+)
+if (!file.exists(ceu_cache_rds)) {
+  stop(sprintf("Missing CEU cache: %s. Run Step 2 first.", ceu_cache_rds))
+}
+ceu_obj <- readRDS(ceu_cache_rds)
+
+F_DIM_TARGET <- as.integer(num_samples) - 1L
+
+segment_width <- function(obj) {
+  w <- as.numeric(obj$right - obj$left)
+  w[!is.finite(w) | (w <= 0)] <- NA_real_
+  w
+}
+
+build_weighted_reference <- function(obj, target_dim) {
+  w <- segment_width(obj)
+  keep <- which(is.finite(w) & (w > 0))
+  if (length(keep) == 0) {
+    stop("No positive-width segments for weighted reference.")
+  }
+
+  F0 <- trim_for_target_dim(obj$F_list[[keep[1]]], target_dim)
+  F_sum <- matrix(0, nrow = nrow(F0), ncol = ncol(F0))
+  w_sum <- 0
+  for (idx in keep) {
+    Fm <- trim_for_target_dim(obj$F_list[[idx]], target_dim)
+    if (nrow(Fm) != nrow(F0) || ncol(Fm) != ncol(F0)) {
+      stop(sprintf(
+        "F dimension mismatch while building weighted reference: base=%dx%d vs current=%dx%d",
+        nrow(F0), ncol(F0), nrow(Fm), ncol(Fm)
+      ))
+    }
+    F_sum <- F_sum + w[idx] * Fm
+    w_sum <- w_sum + w[idx]
+  }
+  F_sum / w_sum
+}
+
+distance_track_to_reference <- function(obj, F_ref, target_dim) {
+  vapply(seq_along(obj$F_list), function(i) {
+    Fm <- trim_for_target_dim(obj$F_list[[i]], target_dim)
+    if (nrow(Fm) != nrow(F_ref) || ncol(Fm) != ncol(F_ref)) {
+      return(NA_real_)
+    }
+    dist_d1(Fm, F_ref)
+  }, numeric(1))
+}
+
+binned_weighted_mean_segments <- function(seg_left, seg_right, seg_val, bin_left, bin_right) {
+  out_mean <- rep(NA_real_, length(bin_left))
+  out_weight <- rep(0, length(bin_left))
+  out_n <- rep(0L, length(bin_left))
+
+  for (i in seq_along(bin_left)) {
+    L <- bin_left[i]
+    R <- bin_right[i]
+    overlap <- pmin(seg_right, R) - pmax(seg_left, L)
+    keep <- which(is.finite(overlap) & overlap > 0)
+    out_n[i] <- as.integer(length(keep))
+    if (length(keep) == 0) {
+      next
+    }
+
+    w <- as.numeric(overlap[keep])
+    out_weight[i] <- sum(w)
+
+    v <- as.numeric(seg_val[keep])
+    ok <- is.finite(v) & is.finite(w) & (w > 0)
+    if (any(ok)) {
+      out_mean[i] <- stats::weighted.mean(v[ok], w = w[ok])
+    }
+  }
+
+  list(mean = out_mean, weight = out_weight, n_segments = out_n)
+}
+
+# CEU/JPT-style references:
+# - within: per-tree distance to each group's chromosome-wide weighted reference
+# - total : per-tree distance to grouped reference (mean of two weighted references)
+F_ref_ceu <- build_weighted_reference(ceu_obj, F_DIM_TARGET)
+F_ref_all <- build_weighted_reference(allpops_obj, F_DIM_TARGET)
+if (nrow(F_ref_ceu) != nrow(F_ref_all) || ncol(F_ref_ceu) != ncol(F_ref_all)) {
+  stop(sprintf(
+    "Reference dimension mismatch (CEU=%dx%d vs allpops=%dx%d)",
+    nrow(F_ref_ceu), ncol(F_ref_ceu), nrow(F_ref_all), ncol(F_ref_all)
+  ))
+}
+F_ref_grouped <- (F_ref_ceu + F_ref_all) / 2
+
+d_within_ceu <- distance_track_to_reference(ceu_obj, F_ref_ceu, F_DIM_TARGET)
+d_within_all <- distance_track_to_reference(allpops_obj, F_ref_all, F_DIM_TARGET)
+d_total_ceu <- distance_track_to_reference(ceu_obj, F_ref_grouped, F_DIM_TARGET)
+d_total_all <- distance_track_to_reference(allpops_obj, F_ref_grouped, F_DIM_TARGET)
+
+x0 <- min(min(ceu_obj$left, na.rm = TRUE), min(allpops_obj$left, na.rm = TRUE))
+x1 <- max(max(ceu_obj$right, na.rm = TRUE), max(allpops_obj$right, na.rm = TRUE))
+x0 <- floor(x0 / bin_size_bp) * bin_size_bp
+x1 <- ceiling(x1 / bin_size_bp) * bin_size_bp
+
+bin_edges <- seq(x0, x1, by = bin_size_bp)
+if (tail(bin_edges, 1) < x1) {
+  bin_edges <- c(bin_edges, x1)
+}
+
+bin_left <- bin_edges[-length(bin_edges)]
+bin_right <- bin_edges[-1]
+bin_mid <- (bin_left + bin_right) / 2
+
+pb_step4 <- progress::progress_bar$new(
+  format = "Step 4 (local F_ST^Tree CEU vs allpops) [:bar] :current/:total (:percent) eta=:eta",
+  total = 1,
+  clear = FALSE,
+  width = 60
+)
+
+ceu_within_bin <- binned_weighted_mean_segments(
+  ceu_obj$left, ceu_obj$right, d_within_ceu, bin_left, bin_right
+)
+all_within_bin <- binned_weighted_mean_segments(
+  allpops_obj$left, allpops_obj$right, d_within_all, bin_left, bin_right
+)
+ceu_total_bin <- binned_weighted_mean_segments(
+  ceu_obj$left, ceu_obj$right, d_total_ceu, bin_left, bin_right
+)
+all_total_bin <- binned_weighted_mean_segments(
+  allpops_obj$left, allpops_obj$right, d_total_all, bin_left, bin_right
+)
+pb_step4$tick()
+
+v_within <- 0.5 * (ceu_within_bin$mean + all_within_bin$mean)
+v_total <- 0.5 * (ceu_total_bin$mean + all_total_bin$mean)
+fst_raw <- 1 - (v_within / v_total)
+fst_raw[!is.finite(v_total) | (v_total <= 0)] <- NA_real_
+fst_clipped <- pmax(0, fst_raw)
+fst_clipped[!is.finite(fst_raw)] <- NA_real_
+
+fst_df <- tibble::tibble(
+  chromosome = CHR,
+  population = fst_pop,
+  baseline = allpops_label,
+  pop_sample_tag = pop_tag,
+  bin_size_bp = as.integer(bin_size_bp),
+  bin_left = as.numeric(bin_left),
+  bin_right = as.numeric(bin_right),
+  bin_mid = as.numeric(bin_mid),
+  n_overlap_pop = as.integer(ceu_within_bin$n_segments),
+  n_overlap_allpops = as.integer(all_within_bin$n_segments),
+  overlap_bp_pop = as.numeric(ceu_within_bin$weight),
+  overlap_bp_allpops = as.numeric(all_within_bin$weight),
+  V_pop_within = as.numeric(ceu_within_bin$mean),
+  V_allpops_within = as.numeric(all_within_bin$mean),
+  V_within = as.numeric(v_within),
+  V_total_grouped = as.numeric(v_total),
+  FST_tree_raw = as.numeric(fst_raw),
+  FST_tree_clipped = as.numeric(fst_clipped)
+)
+
+readr::write_csv(fst_df, out_fst_local_csv)
+
+cat("Saved local F_ST^Tree (CEU vs allpops):", out_fst_local_csv, "\n")
+print(dplyr::slice_head(fst_df, n = 10))
+```

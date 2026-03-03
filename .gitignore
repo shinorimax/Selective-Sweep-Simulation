@@ -19,6 +19,7 @@
 *.panel
 *.tar
 *.bedgraph
+*.rds
 
 # Top-level folders
 argweaver/

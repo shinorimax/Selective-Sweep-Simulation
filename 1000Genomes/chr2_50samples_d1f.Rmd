@@ -1,5 +1,5 @@
 ---
-title: "chr2_50samples D1F"
+title: "chr2 D1F (parameterized sample count)"
 author: "Codex"
 date: "2026-02-12"
 output: html_document
@@ -13,7 +13,7 @@ This notebook computes per-tree **D1F** distances for multiple populations:
 Pipeline:
 1. Use pre-generated Newick (`.tree`) plus interval CSV (`_breaks.csv`) from `1000Genomes/load_1kg_tsz.ipynb`.
 2. Load each tree and compute its F-matrix with `phylodyn::gen_Fmat`.
-3. Build a Kingman `n=50` theoretical-mean proxy tree using expected coalescent waiting times and compute its F-matrix.
+3. Build a Kingman `n=num_samples` theoretical-mean proxy tree using expected coalescent waiting times and compute its F-matrix.
 4. Compute per-tree `D1F = sum(abs(F_tree - F_mean_kingman))` and save results per population.
 
 ## Setup
@@ -38,17 +38,24 @@ results_dir <- file.path(base_dir, "results")
 
 target_pops <- c("CEU", "GBR", "TSI", "JPT", "KHV", "CHB")
 
-out_mean_rds <- file.path(results_dir, "F_mean_kingman_n50_proxy.rds")
+num_samples <- 52L
+sample_tag <- sprintf("%dsamples", as.integer(num_samples))
+
+out_mean_rds <- file.path(results_dir, sprintf("F_mean_kingman_n%d_proxy.rds", as.integer(num_samples)))
 ```
 
-## Kingman `n=50` theoretical-mean proxy tree and F-matrix
+## Kingman `n=num_samples` theoretical-mean proxy tree and F-matrix
 
 ```{r}
-F_mean_kingman <- fmatrix::kingman_m(n = 50L)
+F_mean_kingman <- fmatrix::kingman_m(n = num_samples)
 saveRDS(F_mean_kingman, out_mean_rds)
 
 cat("Saved Kingman mean proxy F-matrix:", out_mean_rds, "
 ")
+
+dist_d1 <- function(F1, F2) {
+  sum(abs(F1 - F2))
+}
 ```
 
 ## Compute per-tree F-matrices and D1F distances (per population)
@@ -58,11 +65,13 @@ dist_d1 <- function(F1, F2) {
   sum(abs(F1 - F2))
 }
 
+CHR <- 2
+
 process_pop <- function(pop) {
-  input_trees <- file.path(trees_dir, sprintf("chr2_50samples_%s.trees", pop))
-  newick_path <- file.path(trees_dir, sprintf("chr2_50samples_%s.tree", pop))
-  breaks_path <- file.path(results_dir, sprintf("chr2_50samples_%s_breaks.csv", pop))
-  out_csv <- file.path(results_dir, sprintf("chr2_50samples_%s_d1f_per_tree.csv", pop))
+  input_trees <- file.path(trees_dir,   sprintf("chr%d_%s_%s.trees", CHR, sample_tag, pop))
+  newick_path <- file.path(trees_dir,   sprintf("chr%d_%s_%s.tree", CHR, sample_tag, pop))
+  breaks_path <- file.path(results_dir, sprintf("chr%d_%s_%s_breaks.csv", CHR, sample_tag, pop))
+  out_csv     <- file.path(results_dir, sprintf("chr%d_%s_%s_d1f_per_tree.csv", CHR, sample_tag, pop))
 
   stopifnot(file.exists(input_trees))
   stopifnot(file.exists(newick_path))
@@ -126,3 +135,516 @@ process_pop <- function(pop) {
 results_list <- lapply(target_pops, process_pop)
 ```
 
+
+
+## Append-only: Chr2 all-population D1F computation
+
+```{r}
+# ----------------------------------------
+# Chr2 all-population D1F computation
+# ----------------------------------------
+CHR2 <- 2L
+
+process_pop_chr2 <- function(pop) {
+  input_trees <- file.path(trees_dir,   sprintf("chr%d_%s_%s.trees", CHR2, sample_tag, pop))
+  newick_path <- file.path(trees_dir,   sprintf("chr%d_%s_%s.tree", CHR2, sample_tag, pop))
+  breaks_path <- file.path(results_dir, sprintf("chr%d_%s_%s_breaks.csv", CHR2, sample_tag, pop))
+  out_csv     <- file.path(results_dir, sprintf("chr%d_%s_%s_d1f_per_tree.csv", CHR2, sample_tag, pop))
+
+  if (!file.exists(input_trees) || !file.exists(newick_path) || !file.exists(breaks_path)) {
+    warning(sprintf("Skipping %s: missing one or more input files for chr2.", pop))
+    return(invisible(NULL))
+  }
+
+  trees <- ape::read.tree(newick_path)
+  if (inherits(trees, "phylo")) {
+    trees <- structure(list(trees), class = "multiPhylo")
+  }
+
+  breaks_df <- readr::read_csv(breaks_path, show_col_types = FALSE) %>%
+    arrange(tree_index)
+
+  cat("Population:", pop, "\n")
+  cat("Trees loaded:", length(trees), "\n")
+  cat("Break rows   :", nrow(breaks_df), "\n")
+
+  n_trees <- length(trees)
+
+  pb <- progress::progress_bar$new(
+    format = sprintf("Computing D1F chr2 (%s) [:bar] :current/:total (:percent) eta=:eta", pop),
+    total = n_trees,
+    clear = FALSE,
+    width = 60
+  )
+
+  d1f_vals <- vapply(seq_len(n_trees), function(i) {
+    pb$tick()
+    Fm <- phylodyn::gen_Fmat(trees[[i]], tol = 8L)
+    dist_d1(Fm, F_mean_kingman)
+  }, numeric(1))
+
+  n_use <- min(length(d1f_vals), nrow(breaks_df))
+  if (length(d1f_vals) != nrow(breaks_df)) {
+    warning(sprintf(
+      "Length mismatch for chr2 %s (trees=%d, breaks=%d). Truncating to %d.",
+      pop, length(d1f_vals), nrow(breaks_df), n_use
+    ))
+  }
+
+  results <- tibble::tibble(
+    file = breaks_df$file[seq_len(n_use)],
+    tree_index = breaks_df$tree_index[seq_len(n_use)],
+    left = breaks_df$left[seq_len(n_use)],
+    right = breaks_df$right[seq_len(n_use)],
+    mid = breaks_df$mid[seq_len(n_use)],
+    d1f_distance = d1f_vals[seq_len(n_use)]
+  )
+
+  readr::write_csv(results, out_csv)
+  cat("Saved per-tree D1F:", out_csv, "\n\n")
+
+  invisible(results)
+}
+
+chr2_pops <- list.files(trees_dir, pattern = sprintf("^chr2_%s_.*\\.tree$", sample_tag))
+chr2_pops <- gsub(sprintf("^chr2_%s_", sample_tag), "", chr2_pops)
+chr2_pops <- gsub("\\.tree$", "", chr2_pops)
+chr2_pops <- sort(unique(chr2_pops))
+
+cat("Chr2 populations discovered:", paste(chr2_pops, collapse = ", "), "\n")
+
+results_list_chr2 <- lapply(chr2_pops, process_pop_chr2)
+```
+
+## [New] Chr2 D1F using population-specific window-size weighted mean F-matrix
+
+```{r}
+# ----------------------------------------
+# Chr2 population-specific weighted-reference D1F
+# ----------------------------------------
+# Reference for each population is:
+#   F_ref(pop) = sum_i [ width_i * F_i ] / sum_i [ width_i ]
+# where width_i = right_i - left_i from the corresponding breaks row.
+
+CHR2_WR <- 2L
+
+compute_weighted_reference_chr2 <- function(pop) {
+  input_trees <- file.path(trees_dir,   sprintf("chr%d_%s_%s.trees", CHR2_WR, sample_tag, pop))
+  newick_path <- file.path(trees_dir,   sprintf("chr%d_%s_%s.tree", CHR2_WR, sample_tag, pop))
+  breaks_path <- file.path(results_dir, sprintf("chr%d_%s_%s_breaks.csv", CHR2_WR, sample_tag, pop))
+
+  out_ref_rds <- file.path(results_dir, sprintf("chr%d_%s_%s_F_weighted_reference.rds", CHR2_WR, sample_tag, pop))
+  out_csv <- file.path(results_dir, sprintf("chr%d_%s_%s_d1f_per_tree_weighted_ref.csv", CHR2_WR, sample_tag, pop))
+
+  if (!file.exists(input_trees) || !file.exists(newick_path) || !file.exists(breaks_path)) {
+    warning(sprintf("Skipping %s: missing one or more input files for chr2 weighted-reference D1F.", pop))
+    return(invisible(NULL))
+  }
+
+  trees <- ape::read.tree(newick_path)
+  if (inherits(trees, "phylo")) {
+    trees <- structure(list(trees), class = "multiPhylo")
+  }
+
+  breaks_df <- readr::read_csv(breaks_path, show_col_types = FALSE) %>%
+    dplyr::arrange(tree_index)
+
+  n_use <- min(length(trees), nrow(breaks_df))
+  if (n_use == 0) {
+    warning(sprintf("Skipping %s: no trees/break rows available.", pop))
+    return(invisible(NULL))
+  }
+
+  if (length(trees) != nrow(breaks_df)) {
+    warning(sprintf(
+      "Length mismatch for weighted-reference chr2 %s (trees=%d, breaks=%d). Truncating to %d.",
+      pop, length(trees), nrow(breaks_df), n_use
+    ))
+  }
+
+  widths <- breaks_df$right[seq_len(n_use)] - breaks_df$left[seq_len(n_use)]
+  valid <- is.finite(widths) & (widths > 0)
+
+  if (!any(valid)) {
+    warning(sprintf("Skipping %s: no positive finite window sizes.", pop))
+    return(invisible(NULL))
+  }
+
+  first_valid <- which(valid)[1]
+  F_first <- phylodyn::gen_Fmat(trees[[first_valid]], tol = 8L)
+  F_weighted_sum <- matrix(0, nrow = nrow(F_first), ncol = ncol(F_first))
+  total_weight <- 0
+
+  pb_ref <- progress::progress_bar$new(
+    format = sprintf("Building weighted F_ref chr2 (%s) [:bar] :current/:total (:percent) eta=:eta", pop),
+    total = sum(valid),
+    clear = FALSE,
+    width = 60
+  )
+
+  for (i in which(valid)) {
+    pb_ref$tick()
+    Fm <- phylodyn::gen_Fmat(trees[[i]], tol = 8L)
+    F_weighted_sum <- F_weighted_sum + widths[i] * Fm
+    total_weight <- total_weight + widths[i]
+  }
+
+  F_ref_weighted <- F_weighted_sum / total_weight
+  saveRDS(F_ref_weighted, out_ref_rds)
+
+  pb_d1f <- progress::progress_bar$new(
+    format = sprintf("Computing D1F weighted-ref chr2 (%s) [:bar] :current/:total (:percent) eta=:eta", pop),
+    total = n_use,
+    clear = FALSE,
+    width = 60
+  )
+
+  d1f_vals <- vapply(seq_len(n_use), function(i) {
+    pb_d1f$tick()
+    Fm <- phylodyn::gen_Fmat(trees[[i]], tol = 8L)
+    dist_d1(Fm, F_ref_weighted)
+  }, numeric(1))
+
+  results <- tibble::tibble(
+    file = breaks_df$file[seq_len(n_use)],
+    tree_index = breaks_df$tree_index[seq_len(n_use)],
+    left = breaks_df$left[seq_len(n_use)],
+    right = breaks_df$right[seq_len(n_use)],
+    mid = breaks_df$mid[seq_len(n_use)],
+    window_size = widths,
+    reference_type = "population_weighted_mean_F",
+    population = pop,
+    d1f_distance = d1f_vals
+  )
+
+  readr::write_csv(results, out_csv)
+
+  cat("Population:", pop, "\n")
+  cat("Reference saved:", out_ref_rds, "\n")
+  cat("Per-tree D1F saved:", out_csv, "\n")
+  cat("Trees used:", n_use, "| Positive-width windows:", sum(valid), "| Total window weight:", total_weight, "\n\n")
+
+  invisible(list(
+    population = pop,
+    ref_path = out_ref_rds,
+    out_csv = out_csv,
+    n_use = n_use,
+    n_valid = sum(valid),
+    total_weight = total_weight
+  ))
+}
+
+chr2_pops_wr <- list.files(trees_dir, pattern = sprintf("^chr2_%s_.*\\.tree$", sample_tag))
+chr2_pops_wr <- gsub(sprintf("^chr2_%s_", sample_tag), "", chr2_pops_wr)
+chr2_pops_wr <- gsub("\\.tree$", "", chr2_pops_wr)
+chr2_pops_wr <- sort(unique(chr2_pops_wr))
+
+cat("Chr2 populations discovered for weighted-reference D1F:", paste(chr2_pops_wr, collapse = ", "), "\n")
+
+chr2_pops_wr <- c("CEU", "GBR", "TSI", "JPT", "KHV", "CHB")
+
+weighted_ref_results <- lapply(chr2_pops_wr, compute_weighted_reference_chr2)
+```
+
+
+## [New] Chr2 CEU-JPT F_ST^Tree using grouped weighted mean reference
+
+```{r}
+# ----------------------------------------
+# Chr2 CEU/JPT F_ST^Tree from D1F distances
+# within: distance to each population weighted mean F
+# total : distance to CEU+JPT grouped weighted mean F
+# ----------------------------------------
+
+CHR2_FST <- 2L
+fst_pops <- c("CEU", "JPT")
+
+load_weighted_ref_dist <- function(pop) {
+  p <- file.path(results_dir, sprintf("chr%d_%s_%s_d1f_per_tree_weighted_ref.csv", CHR2_FST, sample_tag, pop))
+  if (!file.exists(p)) {
+    stop(sprintf("Missing weighted-reference D1F CSV for %s: %s", pop, p))
+  }
+
+  d <- readr::read_csv(p, show_col_types = FALSE)
+  req <- c("left", "right", "d1f_distance")
+  miss <- setdiff(req, names(d))
+  if (length(miss) > 0) {
+    stop(sprintf("%s missing columns: %s", p, paste(miss, collapse = ", ")))
+  }
+
+  if (!("window_size" %in% names(d))) {
+    d$window_size <- d$right - d$left
+  }
+
+  d <- d %>%
+    mutate(
+      left = as.numeric(left),
+      right = as.numeric(right),
+      d1f_distance = as.numeric(d1f_distance),
+      window_size = as.numeric(window_size)
+    ) %>%
+    filter(is.finite(d1f_distance), is.finite(window_size), window_size > 0)
+
+  if (nrow(d) == 0) {
+    stop(sprintf("No valid weighted-reference rows for %s", pop))
+  }
+
+  d
+}
+
+build_grouped_reference_chr2 <- function(pops) {
+  # Use already-saved per-population weighted means and average them.
+  ref_list <- lapply(pops, function(pop) {
+    p <- file.path(results_dir, sprintf("chr%d_%s_%s_F_weighted_reference.rds", CHR2_FST, sample_tag, pop))
+    if (!file.exists(p)) {
+      stop(sprintf("Missing weighted-reference RDS for %s: %s", pop, p))
+    }
+    readRDS(p)
+  })
+
+  dims <- vapply(ref_list, function(m) paste(dim(m), collapse = "x"), character(1))
+  if (length(unique(dims)) != 1) {
+    stop(sprintf("Weighted-reference F dimensions do not match across populations: %s",
+                 paste(sprintf("%s=%s", pops, dims), collapse = ", ")))
+  }
+
+  Reduce(`+`, ref_list) / length(ref_list)
+}
+
+compute_distance_to_grouped_ref <- function(pop, F_grouped_ref) {
+  newick_path <- file.path(trees_dir, sprintf("chr%d_%s_%s.tree", CHR2_FST, sample_tag, pop))
+  breaks_path <- file.path(results_dir, sprintf("chr%d_%s_%s_breaks.csv", CHR2_FST, sample_tag, pop))
+  out_csv <- file.path(results_dir, sprintf("chr%d_%s_%s_d1f_per_tree_grouped_ref.csv", CHR2_FST, sample_tag, pop))
+
+  trees <- ape::read.tree(newick_path)
+  if (inherits(trees, "phylo")) {
+    trees <- structure(list(trees), class = "multiPhylo")
+  }
+
+  breaks_df <- readr::read_csv(breaks_path, show_col_types = FALSE) %>%
+    dplyr::arrange(tree_index)
+
+  n_use <- min(length(trees), nrow(breaks_df))
+  widths <- breaks_df$right[seq_len(n_use)] - breaks_df$left[seq_len(n_use)]
+
+  pb_group <- progress::progress_bar$new(
+    format = sprintf("Computing D1F grouped-ref chr2 (%s) [:bar] :current/:total (:percent) eta=:eta", pop),
+    total = n_use,
+    clear = FALSE,
+    width = 60
+  )
+
+  d_total <- vapply(seq_len(n_use), function(i) {
+    pb_group$tick()
+    Fm <- phylodyn::gen_Fmat(trees[[i]], tol = 8L)
+    dist_d1(Fm, F_grouped_ref)
+  }, numeric(1))
+
+  out <- tibble::tibble(
+    file = breaks_df$file[seq_len(n_use)],
+    tree_index = breaks_df$tree_index[seq_len(n_use)],
+    left = breaks_df$left[seq_len(n_use)],
+    right = breaks_df$right[seq_len(n_use)],
+    mid = breaks_df$mid[seq_len(n_use)],
+    window_size = widths,
+    reference_type = "grouped_weighted_mean_F_CEU_JPT",
+    population = pop,
+    d1f_distance = d_total
+  )
+
+  readr::write_csv(out, out_csv)
+  cat("Saved grouped-reference per-tree D1F:", out_csv, "\n")
+  out
+}
+
+within_df <- lapply(fst_pops, load_weighted_ref_dist)
+names(within_df) <- fst_pops
+
+V_pop <- vapply(fst_pops, function(pop) {
+  weighted.mean(within_df[[pop]]$d1f_distance, w = within_df[[pop]]$window_size)
+}, numeric(1))
+
+F_grouped <- build_grouped_reference_chr2(fst_pops)
+out_grouped_ref_rds <- file.path(results_dir, sprintf("chr2_%s_CEU_JPT_F_grouped_weighted_reference.rds", sample_tag))
+saveRDS(F_grouped, out_grouped_ref_rds)
+cat("Saved grouped weighted reference F:", out_grouped_ref_rds, "\n")
+
+grouped_df <- lapply(fst_pops, function(pop) compute_distance_to_grouped_ref(pop, F_grouped))
+names(grouped_df) <- fst_pops
+
+grouped_all <- dplyr::bind_rows(grouped_df)
+grouped_all <- grouped_all %>%
+  filter(is.finite(d1f_distance), is.finite(window_size), window_size > 0)
+
+V_within <- mean(V_pop)
+V_total <- weighted.mean(grouped_all$d1f_distance, w = grouped_all$window_size)
+FST_tree_raw <- 1 - (V_within / V_total)
+FST_tree_clipped <- max(0, FST_tree_raw)
+
+fst_summary <- tibble::tibble(
+  chromosome = CHR2_FST,
+  pop_A = fst_pops[1],
+  pop_B = fst_pops[2],
+  V_A_within = V_pop[fst_pops[1]],
+  V_B_within = V_pop[fst_pops[2]],
+  V_within = V_within,
+  V_total = V_total,
+  FST_tree_raw = FST_tree_raw,
+  FST_tree_clipped = FST_tree_clipped
+)
+
+out_fst_csv <- file.path(results_dir, sprintf("chr2_%s_CEU_JPT_fst_tree_weighted_grouped_mean.csv", sample_tag))
+readr::write_csv(fst_summary, out_fst_csv)
+
+print(fst_summary)
+cat("Saved F_ST^Tree summary:", out_fst_csv, "\n")
+```
+
+
+## [New] Chr2 binned D1F between population-average F matrices (default CEU vs JPT)
+
+```{r}
+# ----------------------------------------
+# Chr2 binned cross-population D1F
+# For each bin:
+#   1) Build population-specific weighted-average F matrix
+#      using overlap(bp) between tree windows and the bin.
+#   2) Compute D1F distance between the two population averages.
+# ----------------------------------------
+
+CHR2_BIN <- 2L
+bin_size_bp <- 100000L
+pop_pair <- c("CEU", "JPT")
+
+load_pop_for_binned_average <- function(pop) {
+  newick_path <- file.path(trees_dir, sprintf("chr%d_%s_%s.tree", CHR2_BIN, sample_tag, pop))
+  breaks_path <- file.path(results_dir, sprintf("chr%d_%s_%s_breaks.csv", CHR2_BIN, sample_tag, pop))
+
+  if (!file.exists(newick_path) || !file.exists(breaks_path)) {
+    stop(sprintf("Missing input(s) for %s: %s | %s", pop, newick_path, breaks_path))
+  }
+
+  trees <- ape::read.tree(newick_path)
+  if (inherits(trees, "phylo")) {
+    trees <- structure(list(trees), class = "multiPhylo")
+  }
+
+  breaks_df <- readr::read_csv(breaks_path, show_col_types = FALSE) %>%
+    dplyr::arrange(tree_index)
+
+  n_use <- min(length(trees), nrow(breaks_df))
+  if (n_use == 0) {
+    stop(sprintf("No usable trees/break rows for %s", pop))
+  }
+
+  left <- as.numeric(breaks_df$left[seq_len(n_use)])
+  right <- as.numeric(breaks_df$right[seq_len(n_use)])
+
+  pb <- progress::progress_bar$new(
+    format = sprintf("Computing F matrices for chr2 (%s) [:bar] :current/:total (:percent) eta=:eta", pop),
+    total = n_use,
+    clear = FALSE,
+    width = 60
+  )
+
+  F_list <- vector("list", n_use)
+  for (i in seq_len(n_use)) {
+    pb$tick()
+    F_list[[i]] <- phylodyn::gen_Fmat(trees[[i]], tol = 8L)
+  }
+
+  list(pop = pop, left = left, right = right, F_list = F_list)
+}
+
+binned_weighted_F <- function(pop_obj, L, R) {
+  overlap <- pmin(pop_obj$right, R) - pmax(pop_obj$left, L)
+  keep <- which(is.finite(overlap) & overlap > 0)
+
+  if (length(keep) == 0) {
+    return(list(F = NULL, weight = 0, n_segments = 0L))
+  }
+
+  w <- overlap[keep]
+  F0 <- pop_obj$F_list[[keep[1]]]
+  F_sum <- matrix(0, nrow = nrow(F0), ncol = ncol(F0))
+
+  for (j in seq_along(keep)) {
+    idx <- keep[j]
+    F_sum <- F_sum + w[j] * pop_obj$F_list[[idx]]
+  }
+
+  list(
+    F = F_sum / sum(w),
+    weight = sum(w),
+    n_segments = length(keep)
+  )
+}
+
+pop_data <- lapply(pop_pair, load_pop_for_binned_average)
+names(pop_data) <- pop_pair
+
+x0 <- min(vapply(pop_data, function(x) min(x$left, na.rm = TRUE), numeric(1)))
+x1 <- max(vapply(pop_data, function(x) max(x$right, na.rm = TRUE), numeric(1)))
+x0 <- floor(x0 / bin_size_bp) * bin_size_bp
+x1 <- ceiling(x1 / bin_size_bp) * bin_size_bp
+
+bin_edges <- seq(x0, x1, by = bin_size_bp)
+if (tail(bin_edges, 1) < x1) {
+  bin_edges <- c(bin_edges, x1)
+}
+
+bin_left <- bin_edges[-length(bin_edges)]
+bin_right <- bin_edges[-1]
+bin_mid <- (bin_left + bin_right) / 2
+
+pb_bins <- progress::progress_bar$new(
+  format = "Computing binned CEU/JPT D1F [:bar] :current/:total (:percent) eta=:eta",
+  total = length(bin_left),
+  clear = FALSE,
+  width = 60
+)
+
+bin_results <- vector("list", length(bin_left))
+for (i in seq_along(bin_left)) {
+  pb_bins$tick()
+  L <- bin_left[i]
+  R <- bin_right[i]
+
+  popA <- binned_weighted_F(pop_data[[pop_pair[1]]], L, R)
+  popB <- binned_weighted_F(pop_data[[pop_pair[2]]], L, R)
+
+  d_pop <- NA_real_
+  if (!is.null(popA$F) && !is.null(popB$F)) {
+    d_pop <- dist_d1(popA$F, popB$F)
+  }
+
+  bin_results[[i]] <- tibble::tibble(
+    chromosome = CHR2_BIN,
+    pop_A = pop_pair[1],
+    pop_B = pop_pair[2],
+    bin_size_bp = bin_size_bp,
+    bin_left = L,
+    bin_right = R,
+    bin_mid = bin_mid[i],
+    n_overlap_A = as.integer(popA$n_segments),
+    n_overlap_B = as.integer(popB$n_segments),
+    overlap_bp_A = as.numeric(popA$weight),
+    overlap_bp_B = as.numeric(popB$weight),
+    d1f_distance_between_pops = d_pop
+  )
+}
+
+bin_df <- dplyr::bind_rows(bin_results)
+
+out_bin_csv <- file.path(
+  results_dir,
+  sprintf(
+    "chr%d_%s_%s_%s_d1f_between_pop_binned_bin%d.csv",
+    CHR2_BIN, sample_tag, pop_pair[1], pop_pair[2], as.integer(bin_size_bp)
+  )
+)
+
+readr::write_csv(bin_df, out_bin_csv)
+cat("Saved binned cross-population D1F:", out_bin_csv, "\n")
+print(dplyr::slice_head(bin_df, n = 5))
+```

@@ -1,0 +1,205 @@
+---
+title: "chr2_2inds_allpops D1F"
+author: "Codex"
+date: "2026-02-28"
+output: html_document
+---
+
+## Overview
+
+Compute per-tree D1F distances for `chr2_2inds_allpops` in the LCT interval by comparing each tree's F-matrix to a theoretical Kingman mean reference.
+
+Inputs:
+
+- `trees/chr2_2inds_allpops.tree`
+- `results/chr2_2inds_allpops_breaks.csv`
+
+Output:
+
+- `results/chr2_2inds_allpops_d1f_per_tree.csv`
+
+## Setup
+
+```{r, message=FALSE}
+library(ape)
+library(phylodyn)
+library(readr)
+library(dplyr)
+library(fmatrix)
+library(progress)
+
+options(stringsAsFactors = FALSE)
+```
+
+```{r}
+base_dir <- normalizePath(".", winslash = "/", mustWork = TRUE)
+trees_dir <- file.path(base_dir, "trees")
+results_dir <- file.path(base_dir, "results")
+cache_dir <- file.path(results_dir, "fmatrix_cache")
+if (!dir.exists(cache_dir)) {
+  dir.create(cache_dir, recursive = TRUE)
+}
+
+CHR <- 2L
+N_INDS_PER_POP <- 2L
+N_DEFAULT <- 52L
+F_DIM_TARGET <- N_DEFAULT - 1L
+STEM <- sprintf("chr%d_%dinds_allpops", CHR, N_INDS_PER_POP)
+
+newick_path <- file.path(trees_dir, sprintf("%s.tree", STEM))
+breaks_path <- file.path(results_dir, sprintf("%s_breaks.csv", STEM))
+out_csv <- file.path(results_dir, sprintf("%s_d1f_per_tree.csv", STEM))
+out_ref_rds <- file.path(results_dir, sprintf("%s_F_kingman_reference.rds", STEM))
+out_f_cache_rds <- file.path(cache_dir, sprintf("%s_raw_fmats.rds", STEM))
+
+stopifnot(file.exists(newick_path))
+stopifnot(file.exists(breaks_path))
+```
+
+## Kingman reference F-matrix (fixed n=52)
+
+```{r}
+dist_d1 <- function(F1, F2) {
+  sum(abs(F1 - F2))
+}
+
+trim_F_to_target <- function(Fm, target_dim = F_DIM_TARGET) {
+  if (!is.matrix(Fm)) {
+    stop("F matrix must be a matrix.")
+  }
+  if (nrow(Fm) < target_dim || ncol(Fm) < target_dim) {
+    stop(sprintf(
+      "F matrix is smaller than target (%d x %d): got %d x %d",
+      target_dim, target_dim, nrow(Fm), ncol(Fm)
+    ))
+  }
+  Fm[seq_len(target_dim), seq_len(target_dim), drop = FALSE]
+}
+
+as_reference_F <- function(obj, tol = 8L) {
+  if (is.matrix(obj)) {
+    return(obj)
+  }
+  if (inherits(obj, "phylo")) {
+    return(phylodyn::gen_Fmat(obj, tol = tol))
+  }
+  if (is.list(obj) && !is.null(obj$F) && is.matrix(obj$F)) {
+    return(obj$F)
+  }
+  stop("Unsupported object returned by kingman function.")
+}
+
+n_tips <- as.integer(N_DEFAULT)
+ref_method <- "kingman_m"
+if (exists("kingman_f", where = asNamespace("fmatrix"), inherits = FALSE)) {
+  k_obj <- get("kingman_f", envir = asNamespace("fmatrix"))(n = n_tips)
+  ref_method <- "kingman_f"
+} else {
+  k_obj <- fmatrix::kingman_m(n = n_tips)
+}
+
+F_mean_kingman <- as_reference_F(k_obj, tol = 8L)
+F_mean_kingman <- trim_F_to_target(F_mean_kingman, target_dim = F_DIM_TARGET)
+
+saveRDS(F_mean_kingman, out_ref_rds)
+cat("Saved Kingman reference F-matrix:", out_ref_rds, "\n")
+cat("Reference method:", ref_method, "\n")
+```
+
+## Compute per-tree D1F and save CSV
+
+```{r}
+# Mimics chr2_50samples_d1f.Rmd workflow: load all trees once, then vapply.
+trees <- ape::read.tree(newick_path)
+if (inherits(trees, "phylo")) {
+  trees <- structure(list(trees), class = "multiPhylo")
+}
+
+breaks_df <- readr::read_csv(breaks_path, show_col_types = FALSE) %>%
+  dplyr::arrange(tree_index)
+
+cat("Trees loaded:", length(trees), "\n")
+cat("Break rows   :", nrow(breaks_df), "\n")
+
+n_use <- min(length(trees), nrow(breaks_df))
+if (n_use == 0) {
+  stop("No overlapping trees and break rows.")
+}
+if (length(trees) != nrow(breaks_df)) {
+  warning(sprintf(
+    "Length mismatch (trees=%d, breaks=%d). Truncating to %d.",
+    length(trees), nrow(breaks_df), n_use
+  ))
+}
+
+force_recompute_f_cache <- FALSE
+
+cache_valid <- function(obj, n_need, target_dim) {
+  if (!is.list(obj) || length(obj) < n_need) {
+    return(FALSE)
+  }
+  idx <- seq_len(n_need)
+  all(vapply(idx, function(i) {
+    m <- obj[[i]]
+    is.matrix(m) && nrow(m) >= target_dim && ncol(m) >= target_dim
+  }, logical(1)))
+}
+
+F_list <- NULL
+if (file.exists(out_f_cache_rds) && !isTRUE(force_recompute_f_cache)) {
+  cached <- readRDS(out_f_cache_rds)
+  if (cache_valid(cached, n_use, F_DIM_TARGET)) {
+    F_list <- lapply(cached[seq_len(n_use)], trim_F_to_target, target_dim = F_DIM_TARGET)
+    cat("Using cached per-tree F-matrices:", out_f_cache_rds, "\n")
+  } else {
+    warning("Existing F-matrix cache is invalid for current inputs; recomputing.")
+  }
+}
+
+if (is.null(F_list)) {
+  pb_cache <- progress::progress_bar$new(
+    format = "Building F-matrix cache allpops2 [:bar] :current/:total (:percent) eta=:eta",
+    total = n_use,
+    clear = FALSE,
+    width = 60
+  )
+
+  F_list <- lapply(seq_len(n_use), function(i) {
+    pb_cache$tick()
+    Fm <- phylodyn::gen_Fmat(trees[[i]], tol = 8L)
+    trim_F_to_target(Fm, target_dim = F_DIM_TARGET)
+  })
+
+  saveRDS(F_list, out_f_cache_rds)
+  cat("Saved per-tree F-matrix cache:", out_f_cache_rds, "\n")
+}
+
+pb <- progress::progress_bar$new(
+  format = "Computing D1F allpops2 [:bar] :current/:total (:percent) eta=:eta",
+  total = n_use,
+  clear = FALSE,
+  width = 60
+)
+
+d1f_vals <- vapply(seq_len(n_use), function(i) {
+  pb$tick()
+  Fm <- F_list[[i]]
+  dist_d1(Fm, F_mean_kingman)
+}, numeric(1))
+
+results <- tibble::tibble(
+  file = breaks_df$file[seq_len(n_use)],
+  tree_index = breaks_df$tree_index[seq_len(n_use)],
+  left = breaks_df$left[seq_len(n_use)],
+  right = breaks_df$right[seq_len(n_use)],
+  mid = breaks_df$mid[seq_len(n_use)],
+  d1f_distance = d1f_vals,
+  reference_method = ref_method,
+  n_tips = n_tips,
+  f_dim = F_DIM_TARGET
+)
+
+readr::write_csv(results, out_csv)
+cat("Saved per-tree D1F:", out_csv, "\n")
+print(dplyr::slice_head(results, n = 5))
+```

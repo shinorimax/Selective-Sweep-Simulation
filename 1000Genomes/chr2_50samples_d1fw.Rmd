@@ -1,0 +1,353 @@
+---
+title: "chr2_50samples D1FW"
+author: "Codex"
+date: "2026-02-25"
+output: html_document
+---
+
+## Overview
+
+This notebook computes per-tree **D1FW** distances for chr2, 50 samples per population.
+
+Pipeline:
+1. Load each population's Newick (`.tree`) and interval CSV (`_breaks.csv`).
+2. Compute per-tree `FW = Fmat0 * Wmat0` using `phylodyn:::gen.tr.data2`.
+3. Build a shared chr2 reference FW matrix by window-size weighted averaging across all populations.
+4. Compute per-tree `D1FW = sum(abs(FW_tree - FW_reference))` and save one CSV per population.
+
+## Setup
+
+```{r, message=FALSE}
+library(ape)
+library(phylodyn)
+library(readr)
+library(dplyr)
+library(progress)
+
+options(stringsAsFactors = FALSE)
+```
+
+```{r}
+base_dir <- normalizePath(".", winslash = "/", mustWork = TRUE)
+trees_dir <- file.path(base_dir, "trees")
+results_dir <- file.path(base_dir, "results")
+
+CHR <- 2L
+out_ref_rds <- file.path(results_dir, sprintf("chr%d_50samples_FW_weighted_reference_allpops.rds", CHR))
+
+dist_d1 <- function(M1, M2) {
+  sum(abs(M1 - M2))
+}
+
+jitter_internal_edges <- function(tr, eps = 1e-12) {
+  tr2 <- tr
+  if (is.null(tr2$edge.length)) return(tr2)
+
+  n_tip <- ape::Ntip(tr2)
+  idx_internal <- which(tr2$edge[, 2] > n_tip)
+  if (length(idx_internal) == 0) return(tr2)
+
+  ord <- order(tr2$edge[idx_internal, 2], tr2$edge[idx_internal, 1])
+  offsets <- numeric(length(idx_internal))
+  offsets[ord] <- seq_along(ord)
+
+  tr2$edge.length[idx_internal] <- pmax(
+    tr2$edge.length[idx_internal] + eps * offsets,
+    .Machine$double.eps
+  )
+  tr2
+}
+
+binarize_tree <- function(tr) {
+  tr2 <- tr
+  if (!ape::is.binary(tr2)) {
+    tr2 <- ape::multi2di(tr2, random = FALSE)
+  }
+  if (is.null(tr2$edge.length)) {
+    tr2$edge.length <- rep(1, nrow(tr2$edge))
+  }
+  tr2$edge.length[!is.finite(tr2$edge.length) | tr2$edge.length <= 0] <- .Machine$double.eps
+  tr2
+}
+
+jitter_all_edges <- function(tr, eps = 1e-8) {
+  tr2 <- tr
+  idx <- as.numeric(seq_along(tr2$edge.length))
+  mult <- ((idx * 1103515245 + 12345) %% 997) + 1
+  tr2$edge.length <- pmax(tr2$edge.length + eps * mult, .Machine$double.eps)
+  tr2
+}
+
+compute_fw_safe <- function(
+  tr,
+  tol = 8L,
+  tol_retry = c(6L, 4L, 2L, 0L, 10L, 12L, 14L),
+  jitter_eps = c(1e-12, 1e-10, 1e-8, 1e-6, 1e-4)
+) {
+  try_once <- function(tree_obj, use_tol) {
+    try(phylodyn:::gen.tr.data2(tree_obj, tol = use_tol), silent = TRUE)
+  }
+
+  tr0 <- binarize_tree(tr)
+  tols <- unique(c(as.integer(tol), as.integer(tol_retry)))
+  last_msg <- ""
+  tie_msg <- FALSE
+
+  for (tt in tols) {
+    res <- try_once(tr0, tt)
+    if (!inherits(res, "try-error")) {
+      return(list(ok = TRUE, FW = res$Fmat0 * res$Wmat0, msg = ""))
+    }
+    last_msg <- as.character(res)
+    tie_msg <- grepl(
+      "more than one coalescent event at a given time",
+      last_msg,
+      ignore.case = TRUE
+    )
+    if (!tie_msg) {
+      return(list(ok = FALSE, FW = NULL, msg = last_msg))
+    }
+  }
+
+  tr_j <- tr0
+  for (eps in jitter_eps) {
+    tr_j <- jitter_internal_edges(tr_j, eps = eps)
+    tr_j <- jitter_all_edges(tr_j, eps = eps)
+    for (tt in tols) {
+      res <- try_once(tr_j, tt)
+      if (!inherits(res, "try-error")) {
+        return(list(
+          ok = TRUE,
+          FW = res$Fmat0 * res$Wmat0,
+          msg = sprintf("recovered_with_jitter_eps_%g_tol_%d", eps, tt)
+        ))
+      }
+      last_msg <- as.character(res)
+    }
+  }
+
+  list(ok = FALSE, FW = NULL, msg = last_msg)
+}
+
+chr2_pops <- list.files(trees_dir, pattern = sprintf("^chr%d_50samples_.*\\.tree$", CHR))
+chr2_pops <- gsub(sprintf("^chr%d_50samples_", CHR), "", chr2_pops)
+chr2_pops <- gsub("\\.tree$", "", chr2_pops)
+chr2_pops <- sort(unique(chr2_pops))
+
+cat("Chr2 populations discovered:", paste(chr2_pops, collapse = ", "), "\n")
+
+# Manually overrride population list
+chr2_pops <- c("CEU", "GBR", "TSI", "JPT", "KHV", "CHB")
+```
+
+## Build shared chr2 FW reference (window-size weighted across all populations)
+
+```{r}
+if (length(chr2_pops) == 0) {
+  stop("No chr2 population .tree files found in trees_dir.")
+}
+
+FW_weighted_sum <- NULL
+total_weight <- 0
+used_summary <- list()
+
+for (pop in chr2_pops) {
+  input_trees <- file.path(trees_dir, sprintf("chr%d_50samples_%s.trees", CHR, pop))
+  newick_path <- file.path(trees_dir, sprintf("chr%d_50samples_%s.tree", CHR, pop))
+  breaks_path <- file.path(results_dir, sprintf("chr%d_50samples_%s_breaks.csv", CHR, pop))
+
+  if (!file.exists(input_trees) || !file.exists(newick_path) || !file.exists(breaks_path)) {
+    warning(sprintf("Skipping %s for reference build: missing one or more inputs.", pop))
+    next
+  }
+
+  trees <- ape::read.tree(newick_path)
+  if (inherits(trees, "phylo")) {
+    trees <- structure(list(trees), class = "multiPhylo")
+  }
+
+  breaks_df <- readr::read_csv(breaks_path, show_col_types = FALSE) %>%
+    dplyr::arrange(tree_index)
+
+  n_use <- min(length(trees), nrow(breaks_df))
+  if (n_use == 0) next
+
+  widths <- breaks_df$right[seq_len(n_use)] - breaks_df$left[seq_len(n_use)]
+  valid <- is.finite(widths) & (widths > 0)
+  valid_idx <- which(valid)
+  if (length(valid_idx) == 0) {
+    warning(sprintf("Skipping %s for reference build: no positive finite window sizes.", pop))
+    next
+  }
+
+  pb <- progress::progress_bar$new(
+    format = sprintf("Building FW ref chr2 (%s) [:bar] :current/:total (:percent) eta=:eta", pop),
+    total = length(valid_idx),
+    clear = FALSE,
+    width = 60
+  )
+
+  fail_ref <- 0L
+  for (i in valid_idx) {
+    pb$tick()
+    fw_out <- compute_fw_safe(trees[[i]], tol = 8L)
+    if (!isTRUE(fw_out$ok)) {
+      fail_ref <- fail_ref + 1L
+      next
+    }
+    FWm <- fw_out$FW
+    if (is.null(FW_weighted_sum)) {
+      FW_weighted_sum <- matrix(0, nrow = nrow(FWm), ncol = ncol(FWm))
+    }
+    FW_weighted_sum <- FW_weighted_sum + widths[i] * FWm
+    total_weight <- total_weight + widths[i]
+  }
+
+  used_summary[[pop]] <- c(
+    trees = length(trees),
+    breaks = nrow(breaks_df),
+    n_use = n_use,
+    valid_windows = length(valid_idx),
+    fw_failures = fail_ref,
+    total_width = sum(widths[valid_idx])
+  )
+}
+
+if (is.null(FW_weighted_sum) || total_weight <= 0) {
+  stop("Failed to build FW reference: no usable trees/windows found.")
+}
+
+FW_ref <- FW_weighted_sum / total_weight
+saveRDS(FW_ref, out_ref_rds)
+
+cat("Saved shared chr2 FW reference:", out_ref_rds, "\n")
+cat("Total reference weight:", total_weight, "\n")
+print(used_summary)
+```
+
+## Compute per-tree FW matrices and D1FW distances (per population)
+
+```{r}
+if (!exists("CHR", inherits = FALSE)) {
+  CHR <- 2L
+}
+
+if (!exists("base_dir", inherits = FALSE)) {
+  base_dir <- normalizePath(".", winslash = "/", mustWork = TRUE)
+}
+if (!exists("trees_dir", inherits = FALSE)) {
+  trees_dir <- file.path(base_dir, "trees")
+}
+if (!exists("results_dir", inherits = FALSE)) {
+  results_dir <- file.path(base_dir, "results")
+}
+if (!exists("out_ref_rds", inherits = FALSE)) {
+  out_ref_rds <- file.path(results_dir, sprintf("chr%d_50samples_FW_weighted_reference_allpops.rds", CHR))
+}
+
+if (!exists("dist_d1", mode = "function")) {
+  dist_d1 <- function(M1, M2) sum(abs(M1 - M2))
+}
+
+if (!exists("compute_fw_safe", mode = "function")) {
+  stop("compute_fw_safe() is not defined. Run the setup chunk that defines helper functions first.")
+}
+
+if (!exists("FW_ref", inherits = FALSE)) {
+  if (!file.exists(out_ref_rds)) {
+    stop(sprintf(
+      "FW_ref is not in memory and reference RDS is missing: %s\nRun the reference-build chunk first or provide this file.",
+      out_ref_rds
+    ))
+  }
+  FW_ref <- readRDS(out_ref_rds)
+}
+
+if (!exists("chr2_pops", inherits = FALSE) || length(chr2_pops) == 0) {
+  chr2_pops <- list.files(trees_dir, pattern = sprintf("^chr%d_50samples_.*\\.tree$", CHR))
+  chr2_pops <- gsub(sprintf("^chr%d_50samples_", CHR), "", chr2_pops)
+  chr2_pops <- gsub("\\.tree$", "", chr2_pops)
+  chr2_pops <- sort(unique(chr2_pops))
+}
+
+process_pop_chr2_d1fw <- function(pop) {
+  input_trees <- file.path(trees_dir, sprintf("chr%d_50samples_%s.trees", CHR, pop))
+  newick_path <- file.path(trees_dir, sprintf("chr%d_50samples_%s.tree", CHR, pop))
+  breaks_path <- file.path(results_dir, sprintf("chr%d_50samples_%s_breaks.csv", CHR, pop))
+  out_csv <- file.path(results_dir, sprintf("chr%d_50samples_%s_d1fw_per_tree_weighted_ref.csv", CHR, pop))
+
+  if (!file.exists(input_trees) || !file.exists(newick_path) || !file.exists(breaks_path)) {
+    warning(sprintf("Skipping %s: missing one or more input files for chr2 D1FW.", pop))
+    return(invisible(NULL))
+  }
+
+  trees <- ape::read.tree(newick_path)
+  if (inherits(trees, "phylo")) {
+    trees <- structure(list(trees), class = "multiPhylo")
+  }
+
+  breaks_df <- readr::read_csv(breaks_path, show_col_types = FALSE) %>%
+    dplyr::arrange(tree_index)
+
+  n_use <- min(length(trees), nrow(breaks_df))
+  if (n_use == 0) {
+    warning(sprintf("Skipping %s: no trees/break rows available.", pop))
+    return(invisible(NULL))
+  }
+
+  if (length(trees) != nrow(breaks_df)) {
+    warning(sprintf(
+      "Length mismatch for chr2 D1FW %s (trees=%d, breaks=%d). Truncating to %d.",
+      pop, length(trees), nrow(breaks_df), n_use
+    ))
+  }
+
+  widths <- breaks_df$right[seq_len(n_use)] - breaks_df$left[seq_len(n_use)]
+  valid <- is.finite(widths) & (widths > 0)
+
+  pb <- progress::progress_bar$new(
+    format = sprintf("Computing D1FW chr2 (%s) [:bar] :current/:total (:percent) eta=:eta", pop),
+    total = n_use,
+    clear = FALSE,
+    width = 60
+  )
+
+  d1fw_vals <- rep(NA_real_, n_use)
+  fw_failures <- 0L
+
+  for (i in seq_len(n_use)) {
+    pb$tick()
+    fw_out <- compute_fw_safe(trees[[i]], tol = 8L)
+    if (!isTRUE(fw_out$ok)) {
+      fw_failures <- fw_failures + 1L
+      next
+    }
+    d1fw_vals[i] <- dist_d1(fw_out$FW, FW_ref)
+  }
+
+  results <- tibble::tibble(
+    file = breaks_df$file[seq_len(n_use)],
+    tree_index = breaks_df$tree_index[seq_len(n_use)],
+    left = breaks_df$left[seq_len(n_use)],
+    right = breaks_df$right[seq_len(n_use)],
+    mid = breaks_df$mid[seq_len(n_use)],
+    window_size = widths,
+    reference_type = "all_population_weighted_mean_FW",
+    population = pop,
+    d1fw_distance = d1fw_vals
+  )
+
+  results <- results %>%
+    dplyr::filter(valid)
+
+  readr::write_csv(results, out_csv)
+  cat("Saved per-tree D1FW:", out_csv, "\n")
+  cat("Population:", pop, "| Trees used:", n_use, "| FW failures:", fw_failures,
+      "| Valid windows:", sum(valid), "\n\n")
+
+  invisible(results)
+}
+
+d1fw_results <- lapply(chr2_pops, process_pop_chr2_d1fw)
+```
+
