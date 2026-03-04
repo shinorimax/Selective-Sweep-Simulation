@@ -23,7 +23,7 @@
 
 # Top-level folders
 argweaver/
-Images/
+# Images/
 Results/
 
 # Python environments and caches

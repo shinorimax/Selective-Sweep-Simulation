@@ -402,7 +402,7 @@ print(dplyr::slice_head(out_df, n = 10))
 ## Step 4: Compute local F_ST^Tree for CEU vs allpops (CEU/JPT-matched workflow)
 
 ```{r}
-fst_pop <- "KHV"
+fst_pop <- "CHB"
 out_fst_local_csv <- file.path(
   results_dir,
   sprintf("chr%d_%s_%s_vs_allpops2inds_fst_tree_local_bin%d.csv", CHR, pop_tag, fst_pop, as.integer(bin_size_bp))
