@@ -1,0 +1,442 @@
+---
+title: "chr2 signed D1F for 52-tip population trees"
+author: "Codex"
+date: "2026-03-16"
+output: html_document
+---
+
+## Overview
+
+This notebook computes the signed distance
+
+\[
+D1F_{signed}(x, T_k)
+\]
+
+for chr2 trees from:
+
+- `CEU`
+- `GBR`
+- `TSI`
+- `JPT`
+- `KHV`
+- `CHB`
+- `allpop` (2 individuals from each of 26 populations; 52 tips total)
+
+The sign rule is:
+
+- negative if `D1F(x, T_unb) <= D1F(x, T_bal)`
+- positive otherwise
+
+The workflow reuses saved raw F-matrix caches in `results/fmatrix_cache` whenever they already exist, so raw per-tree F-matrices do not need to be recomputed unnecessarily.
+
+## Setup
+
+```{r, message=FALSE}
+# Load packages used for tree reading, F-matrix generation, and CSV/RDS I/O.
+library(ape)
+library(phylodyn)
+library(readr)
+library(dplyr)
+library(fmatrix)
+library(progress)
+library(tibble)
+
+options(stringsAsFactors = FALSE)
+```
+
+## Paths and target definitions
+
+```{r}
+# Define the working directories and the chr2 target tree sets to process.
+base_dir <- normalizePath(".", winslash = "/", mustWork = TRUE)
+trees_dir <- file.path(base_dir, "trees")
+results_dir <- file.path(base_dir, "results")
+cache_dir <- file.path(results_dir, "fmatrix_cache")
+
+if (!dir.exists(cache_dir)) {
+  dir.create(cache_dir, recursive = TRUE)
+}
+
+CHR <- 2L
+N_TIPS <- 52L
+F_DIM_TARGET <- N_TIPS - 1L
+
+target_specs <- tibble::tribble(
+  ~target_label, ~source_stem,                 ~cache_stem,               ~output_stem,
+  "CEU",         "chr2_52samples_CEU",         "chr2_52samples_CEU",      "chr2_52samples_CEU",
+  "GBR",         "chr2_52samples_GBR",         "chr2_52samples_GBR",      "chr2_52samples_GBR",
+  "TSI",         "chr2_52samples_TSI",         "chr2_52samples_TSI",      "chr2_52samples_TSI",
+  "JPT",         "chr2_52samples_JPT",         "chr2_52samples_JPT",      "chr2_52samples_JPT",
+  "KHV",         "chr2_52samples_KHV",         "chr2_52samples_KHV",      "chr2_52samples_KHV",
+  "CHB",         "chr2_52samples_CHB",         "chr2_52samples_CHB",      "chr2_52samples_CHB",
+  "allpop",      "chr2_2inds_allpops",         "chr2_allpops_2inds",      "chr2_2inds_allpops"
+)
+
+combined_out_csv <- file.path(results_dir, "chr2_signed_d1f_per_tree_selected_targets.csv")
+reference_out_rds <- file.path(results_dir, "chr2_signed_d1f_reference_matrices_n52.rds")
+manifest_out_csv <- file.path(results_dir, "chr2_signed_d1f_output_manifest.csv")
+
+print(target_specs)
+```
+
+## Helper functions for references and distances
+
+```{r}
+# Compute the unsigned D1F distance between two F matrices.
+dist_d1 <- function(F1, F2) {
+  sum(abs(F1 - F2))
+}
+
+# Keep only the common 51 x 51 block used for all 52-tip comparisons.
+trim_F_to_target <- function(Fm, target_dim = F_DIM_TARGET) {
+  if (!is.matrix(Fm)) {
+    stop("F matrix must be a matrix.")
+  }
+  if (nrow(Fm) < target_dim || ncol(Fm) < target_dim) {
+    stop(sprintf(
+      "F matrix is smaller than target (%d x %d): got %d x %d",
+      target_dim, target_dim, nrow(Fm), ncol(Fm)
+    ))
+  }
+  Fm[seq_len(target_dim), seq_len(target_dim), drop = FALSE]
+}
+
+# Convert supported objects from the fmatrix package into a plain matrix.
+as_reference_F <- function(obj, tol = 8L) {
+  if (is.matrix(obj)) {
+    return(obj)
+  }
+  if (inherits(obj, "phylo")) {
+    return(phylodyn::gen_Fmat(obj, tol = tol))
+  }
+  if (is.list(obj) && !is.null(obj$F) && is.matrix(obj$F)) {
+    return(obj$F)
+  }
+  stop("Unsupported object returned by reference-tree function.")
+}
+
+# Call an fmatrix constructor with either named or positional n, depending on the function signature.
+call_reference_constructor <- function(fun_name, n_tips) {
+  fun <- get(fun_name, envir = asNamespace("fmatrix"))
+
+  out <- tryCatch(
+    fun(n = n_tips),
+    error = function(e_named) {
+      tryCatch(
+        fun(n_tips),
+        error = function(e_positional) {
+          stop(sprintf(
+            "Failed to call fmatrix::%s with n=%d using named or positional arguments.",
+            fun_name, n_tips
+          ))
+        }
+      )
+    }
+  )
+
+  out
+}
+
+# Apply the sign rule based on proximity to the unbalanced vs balanced reference.
+signed_d1f_to_kingman <- function(F_tree, F_kingman, F_unb, F_bal) {
+  d_kingman <- dist_d1(F_tree, F_kingman)
+  d_unb <- dist_d1(F_tree, F_unb)
+  d_bal <- dist_d1(F_tree, F_bal)
+
+  signed_val <- if (d_unb <= d_bal) -d_kingman else d_kingman
+
+  list(
+    d1f_signed = signed_val,
+    d1f_kingman = d_kingman,
+    d1f_unbalanced = d_unb,
+    d1f_balanced = d_bal,
+    closer_to = if (d_unb <= d_bal) "unbalanced" else "balanced"
+  )
+}
+```
+
+## Helper functions for tree inputs and cache reuse
+
+```{r}
+# Read a Newick file and return a multiPhylo object.
+read_multi_phylo <- function(newick_path) {
+  trees <- ape::read.tree(newick_path)
+  if (inherits(trees, "phylo")) {
+    trees <- structure(list(trees), class = "multiPhylo")
+  }
+  trees
+}
+
+# Load the accompanying interval table and keep rows in tree order.
+read_breaks_df <- function(breaks_path) {
+  readr::read_csv(breaks_path, show_col_types = FALSE) %>%
+    dplyr::arrange(tree_index)
+}
+
+# Return cache path candidates; for allpop we support both cache names already used in the repo.
+cache_candidates_for_target <- function(spec) {
+  if (identical(spec$target_label, "allpop")) {
+    return(c(
+      file.path(cache_dir, "chr2_allpops_2inds_raw_fmats.rds"),
+      file.path(cache_dir, "chr2_2inds_allpops_raw_fmats.rds")
+    ))
+  }
+
+  file.path(cache_dir, sprintf("%s_raw_fmats.rds", spec$cache_stem))
+}
+
+# Check whether an existing cache contains usable matrices for the requested number of trees.
+cache_valid <- function(obj, n_need, target_dim) {
+  F_list <- NULL
+
+  if (is.list(obj) && !is.null(obj$F_list) && is.list(obj$F_list)) {
+    F_list <- obj$F_list
+  } else if (is.list(obj)) {
+    F_list <- obj
+  }
+
+  if (is.null(F_list) || length(F_list) < n_need) {
+    return(FALSE)
+  }
+
+  idx <- seq_len(n_need)
+  all(vapply(idx, function(i) {
+    m <- F_list[[i]]
+    is.matrix(m) && nrow(m) >= target_dim && ncol(m) >= target_dim
+  }, logical(1)))
+}
+
+# Normalize either cache layout used in this repository into a single object with F_list + breaks.
+normalize_cached_object <- function(cached, breaks_df, n_use, target_dim) {
+  if (!cache_valid(cached, n_use, target_dim)) {
+    stop("Cache is not valid for the requested number of trees.")
+  }
+
+  if (is.list(cached) && !is.null(cached$F_list) && is.list(cached$F_list)) {
+    left <- cached$left
+    right <- cached$right
+    F_list <- cached$F_list
+  } else {
+    left <- breaks_df$left
+    right <- breaks_df$right
+    F_list <- cached
+  }
+
+  list(
+    left = as.numeric(left[seq_len(n_use)]),
+    right = as.numeric(right[seq_len(n_use)]),
+    F_list = lapply(F_list[seq_len(n_use)], trim_F_to_target, target_dim = target_dim)
+  )
+}
+
+# Reuse an existing raw cache when possible; otherwise compute it once and save it.
+load_or_build_f_cache <- function(spec, force_recompute = FALSE, tol = 8L) {
+  newick_path <- file.path(trees_dir, sprintf("%s.tree", spec$source_stem))
+  breaks_path <- file.path(results_dir, sprintf("%s_breaks.csv", spec$source_stem))
+
+  if (!file.exists(newick_path) || !file.exists(breaks_path)) {
+    stop(sprintf(
+      "Missing input(s) for %s: %s | %s",
+      spec$target_label, newick_path, breaks_path
+    ))
+  }
+
+  breaks_df <- read_breaks_df(breaks_path)
+  trees <- NULL
+  n_use <- NA_integer_
+
+  if (!isTRUE(force_recompute)) {
+    for (candidate in cache_candidates_for_target(spec)) {
+      if (!file.exists(candidate)) {
+        next
+      }
+
+      cached <- readRDS(candidate)
+
+      if (is.null(trees)) {
+        trees <- read_multi_phylo(newick_path)
+        n_use <- min(length(trees), nrow(breaks_df))
+      }
+
+      if (n_use == 0) {
+        stop(sprintf("No overlapping trees and break rows for %s.", spec$target_label))
+      }
+
+      if (cache_valid(cached, n_use, F_DIM_TARGET)) {
+        obj <- normalize_cached_object(cached, breaks_df, n_use, F_DIM_TARGET)
+        attr(obj, "cache_path_used") <- candidate
+        attr(obj, "cache_source") <- "existing"
+        return(obj)
+      }
+    }
+  }
+
+  if (is.null(trees)) {
+    trees <- read_multi_phylo(newick_path)
+    n_use <- min(length(trees), nrow(breaks_df))
+  }
+
+  if (n_use == 0) {
+    stop(sprintf("No overlapping trees and break rows for %s.", spec$target_label))
+  }
+
+  if (length(trees) != nrow(breaks_df)) {
+    warning(sprintf(
+      "Length mismatch for %s (trees=%d, breaks=%d). Truncating to %d.",
+      spec$target_label, length(trees), nrow(breaks_df), n_use
+    ))
+  }
+
+  pb <- progress::progress_bar$new(
+    format = sprintf("Building raw F cache (%s) [:bar] :current/:total (:percent) eta=:eta", spec$target_label),
+    total = n_use,
+    clear = FALSE,
+    width = 60
+  )
+
+  F_list <- lapply(seq_len(n_use), function(i) {
+    pb$tick()
+    trim_F_to_target(phylodyn::gen_Fmat(trees[[i]], tol = tol), target_dim = F_DIM_TARGET)
+  })
+
+  obj <- list(
+    left = as.numeric(breaks_df$left[seq_len(n_use)]),
+    right = as.numeric(breaks_df$right[seq_len(n_use)]),
+    F_list = F_list
+  )
+
+  save_path <- cache_candidates_for_target(spec)[1]
+  saveRDS(obj, save_path)
+  attr(obj, "cache_path_used") <- save_path
+  attr(obj, "cache_source") <- "newly_built"
+  obj
+}
+```
+
+## Build the three 52-tip reference F-matrices
+
+```{r}
+# Construct and save the Kingman, balanced, and unbalanced reference F matrices for n = 52.
+F_kingman <- trim_F_to_target(
+  as_reference_F(call_reference_constructor("kingman_m", N_TIPS)),
+  target_dim = F_DIM_TARGET
+)
+
+F_bal <- trim_F_to_target(
+  as_reference_F(call_reference_constructor("bal_Fmat", N_TIPS)),
+  target_dim = F_DIM_TARGET
+)
+
+F_unb <- trim_F_to_target(
+  as_reference_F(call_reference_constructor("unb_Fmat", N_TIPS)),
+  target_dim = F_DIM_TARGET
+)
+
+reference_bundle <- list(
+  n_tips = N_TIPS,
+  f_dim = F_DIM_TARGET,
+  F_kingman = F_kingman,
+  F_bal = F_bal,
+  F_unb = F_unb
+)
+
+saveRDS(reference_bundle, reference_out_rds)
+cat("Saved reference matrices:", reference_out_rds, "\n")
+```
+
+## Helper function to compute signed D1F for one target
+
+```{r}
+# Compute per-tree signed D1F for a single target and write the corresponding CSV.
+compute_signed_d1f_for_target <- function(spec, force_recompute_cache = FALSE) {
+  cache_obj <- load_or_build_f_cache(spec, force_recompute = force_recompute_cache)
+
+  breaks_path <- file.path(results_dir, sprintf("%s_breaks.csv", spec$source_stem))
+  breaks_df <- read_breaks_df(breaks_path)
+
+  n_use <- min(length(cache_obj$F_list), nrow(breaks_df))
+  if (n_use == 0) {
+    stop(sprintf("No usable rows for %s.", spec$target_label))
+  }
+
+  pb <- progress::progress_bar$new(
+    format = sprintf("Computing signed D1F (%s) [:bar] :current/:total (:percent) eta=:eta", spec$target_label),
+    total = n_use,
+    clear = FALSE,
+    width = 60
+  )
+
+  score_df <- purrr::map_dfr(seq_len(n_use), function(i) {
+    pb$tick()
+
+    signed_obj <- signed_d1f_to_kingman(
+      F_tree = cache_obj$F_list[[i]],
+      F_kingman = F_kingman,
+      F_unb = F_unb,
+      F_bal = F_bal
+    )
+
+    tibble::tibble(
+      chromosome = CHR,
+      target = spec$target_label,
+      source_stem = spec$source_stem,
+      file = breaks_df$file[i],
+      tree_index = breaks_df$tree_index[i],
+      left = as.numeric(breaks_df$left[i]),
+      right = as.numeric(breaks_df$right[i]),
+      mid = as.numeric(breaks_df$mid[i]),
+      d1f_signed = signed_obj$d1f_signed,
+      d1f_kingman = signed_obj$d1f_kingman,
+      d1f_unbalanced = signed_obj$d1f_unbalanced,
+      d1f_balanced = signed_obj$d1f_balanced,
+      sign_basis = signed_obj$closer_to,
+      n_tips = N_TIPS,
+      f_dim = F_DIM_TARGET,
+      raw_f_cache = attr(cache_obj, "cache_path_used"),
+      raw_f_cache_source = attr(cache_obj, "cache_source")
+    )
+  })
+
+  out_csv <- file.path(results_dir, sprintf("%s_d1f_signed_per_tree.csv", spec$output_stem))
+  readr::write_csv(score_df, out_csv)
+
+  cat("Saved signed D1F output:", out_csv, "\n")
+  cat("Raw F cache used:", attr(cache_obj, "cache_path_used"), "\n")
+
+  score_df
+}
+```
+
+## Compute signed D1F for the selected populations and allpop
+
+```{r}
+# Run the signed-D1F calculation for each requested target and save both per-target and combined outputs.
+force_recompute_cache <- FALSE
+
+all_results <- vector("list", nrow(target_specs))
+output_manifest <- vector("list", nrow(target_specs))
+
+for (i in seq_len(nrow(target_specs))) {
+  spec <- target_specs[i, ]
+  out_df <- compute_signed_d1f_for_target(spec, force_recompute_cache = force_recompute_cache)
+  all_results[[i]] <- out_df
+
+  output_manifest[[i]] <- tibble::tibble(
+    target = spec$target_label,
+    source_stem = spec$source_stem,
+    output_csv = file.path(results_dir, sprintf("%s_d1f_signed_per_tree.csv", spec$output_stem))
+  )
+}
+
+combined_df <- dplyr::bind_rows(all_results)
+manifest_df <- dplyr::bind_rows(output_manifest)
+
+readr::write_csv(combined_df, combined_out_csv)
+readr::write_csv(manifest_df, manifest_out_csv)
+
+cat("Saved combined signed D1F CSV:", combined_out_csv, "\n")
+cat("Saved output manifest:", manifest_out_csv, "\n")
+
+print(dplyr::slice_head(combined_df, n = 10))
+```
