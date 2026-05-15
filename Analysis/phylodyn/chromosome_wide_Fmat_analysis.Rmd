@@ -34,11 +34,11 @@ library(phylodyn)
 ## Calculate and store d-1 distance to empirical Kingman
 
 ```{r}
-# F_weighted_neutrals <- readRDS("data/F_weighted_average_neutrals.rds")
-# F_weighted_selectives_s0.01_f0.75 <- readRDS("data/F_weighted_average_selectives_s0.01_f0.75.rds")
+F_weighted_neutrals <- readRDS("data/F_weighted_average_neutrals.rds")
+F_weighted_selectives_s0.01_f0.75 <- readRDS("data/F_weighted_average_selectives_s0.01_f0.75.rds")
 
-F_weighted_neutrals <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/F_weighted_average_neutrals.rds")
-F_weighted_selectives_s0.01_f0.75 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/F_weighted_average_selectives_s0.01_f0.75.rds")
+# F_weighted_neutrals <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/F_weighted_average_neutrals.rds")
+# F_weighted_selectives_s0.01_f0.75 <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/F_weighted_average_selectives_s0.01_f0.75.rds")
 
 # Follow "s={s}F={F}" naming rule
 scenario_tag <- "s=0.01F=0.75"
@@ -58,7 +58,7 @@ F_weighted_list_neutral_test <- F_weighted_neutrals[1: half_idx -1]
 F_weighted_list_selective <- F_weighted_selectives_s0.01_f0.75
 
 # --- 3. Load or reference the empirical mean F-matrix ------------------------
-F_mean_neutral <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/F_empirical_kingman.rds")
+F_mean_neutral <- readRDS("data/F_empirical_kingman.rds")
 # F_mean_neutral <- readRDS("data/F_empirical_kingman.rds")
 
 # --- 4. Compute distances to empirical mean ----------------------------------
@@ -172,11 +172,11 @@ fmt <- function(x) {
 }
 
 # # --- Load once ----------------------------------------------------------------
-# F_weighted_neutrals <- readRDS("data/F_weighted_average_neutrals.rds")
-# F_mean_neutral      <- readRDS("data/F_empirical_kingman.rds")
+F_weighted_neutrals <- readRDS("data/F_weighted_average_neutrals.rds")
+F_mean_neutral      <- readRDS("data/F_empirical_kingman.rds")
 
-F_weighted_neutrals <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/F_weighted_average_neutrals.rds")
-F_mean_neutral      <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/F_empirical_kingman.rds")
+# F_weighted_neutrals <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/F_weighted_average_neutrals.rds")
+# F_mean_neutral      <- readRDS("/Users/yagishinnosuke/Documents/2025-2026 Stanford/Palacios Lab/bim-paper/Simulations/data/F_empirical_kingman.rds")
 
 # neutral test half (same for all scenarios)
 n_total   <- length(F_weighted_neutrals)

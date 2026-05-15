@@ -12,4 +12,4 @@ dependencies:
   - scipy
   - pip
   - pip:
-      - bim
+      - git+https://github.com/jthlab/bim.git

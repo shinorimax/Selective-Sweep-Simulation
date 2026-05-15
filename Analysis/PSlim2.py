@@ -12,15 +12,9 @@ try:
 except Exception:
     _HAVE_SKLEARN = False
 
-import sys
-# add the parent of the *inner* bim/ to sys.path
-sys.path.insert(0, "/opt/anaconda3/envs/sweep312/bin/bim")
-from bim.utils import InferEta
-
 # ---- optional: demography inference helper (only if you actually train eta) ----
-# If you won't use train_eta(), you can ignore this import and leave it commented.
-# sys.path.append('/home/enes/bim/')
-# from utils import InferEta
+# Importing bim.utils imports JAX, which can be slow or fragile on Windows. Keep
+# it lazy so importing PSlim2 still works for analysis steps that use saved eta.
 
 
 # ----------------------------- utilities -----------------------------
@@ -333,8 +327,15 @@ class Experiment:
         Fit eta (demography) from neutral SFS and save to JSON at Args[setid]['etapath'].
         Requires utils.InferEta; skip if you don't use it.
         """
-        if 'InferEta' not in globals():
-            raise ImportError("InferEta not available. Uncomment its import if you need train_eta().")
+        try:
+            from bim.utils import InferEta
+        except Exception as exc:
+            raise ImportError(
+                "Could not import bim.utils.InferEta. This is only required for "
+                "train_eta(); other analysis steps can use existing eta JSON files. "
+                "If you need train_eta(), fix the JAX/JAXLIB/NumPy install in the "
+                "sweep312 environment."
+            ) from exc
 
         Args = self.Args
         AFS = self.AFS
@@ -363,6 +364,9 @@ class Experiment:
             ai = np.r_[ai[0], ai[diff + 1]]
 
             outname = Args[setid]['etapath']
+            outdir = os.path.dirname(outname)
+            if outdir:
+                os.makedirs(outdir, exist_ok=True)
             with open(outname, 'w') as fp:
                 json.dump({0: {'t': ti.tolist(), 'a': (1 / ai).tolist()}}, fp)
         print('Done!')
@@ -393,9 +397,14 @@ class Experiment:
         else:
             extra_args = [a.replace("--stats=", "--stat=").replace("--treew=", "--weights=") for a in arg]
 
-        # how to invoke
-        use_cli = (os.path.sep in BIM and os.access(BIM, os.X_OK)) or shutil.which(BIM)
-        prefix = [BIM] if use_cli else [sys.executable, BIM]
+        # how to invoke. Prefer the repo-owned compatibility wrapper so the
+        # analysis is reproducible across machines without editing site-packages.
+        compat_bim = os.path.join(os.path.dirname(__file__), "bim_compat.py")
+        if os.path.exists(compat_bim):
+            prefix = [sys.executable, compat_bim]
+        else:
+            use_cli = (os.path.sep in BIM and os.access(BIM, os.X_OK)) or shutil.which(BIM)
+            prefix = [BIM] if use_cli else [sys.executable, BIM]
 
         msgs = []
         self.outs[setid] = []

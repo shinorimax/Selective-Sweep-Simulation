@@ -20,7 +20,7 @@ The project uses **three reproducible conda environments** to maintain compatibi
 To create them from scratch:
 
 ```bash
-conda env create -f Simulation/Slim\(primary\)/env_sim312.yml
+conda env create -f "Simulation/Slim(primary)/env_sim312.yml"
 conda activate sim312
 conda install ipykernel
 python -m ipykernel install --user --name sim312 --display-name "sim312"
@@ -79,14 +79,14 @@ The analysis pipeline for the *"Detecting selection at genome-wide level"* and *
 ### `Simulation/Slim(primary)/`
 
 Contains the **forward-time simulation pipeline** and replication of the paper  
-**["Robust detection of natural selection using a probabilistic model of tree imbalance."](https://academic.oup.com/genetics/article/220/3/iyac009/6511494?login=false)**
+["Robust detection of natural selection using a probabilistic model of tree imbalance."](https://academic.oup.com/genetics/article/220/3/iyac009/6511494?login=false)
 
 - `**Simulation.ipynb`** — Main Jupyter notebook to run SLiM simulations (use `sim312` conda environment)
 - `**binary_to_newick.ipynb`** — Converts binary `.trees` files to Newick format for R analysis
 - `**PSlim.py`** — Main Python driver for running SLiM simulations and recapitating trees with msprime
-- `**recap.py*`* — Post-simulation recapitation script (extends SLiM output to coalescent-compatible `.trees` files)
-- `**Slim.txt**` — Core SLiM script defining population demography, mutation, and selection parameters
-- `**env_sim312.yml**` — Conda environment specification for simulations
+- `**recap.py`** — Post-simulation recapitation script (extends SLiM output to coalescent-compatible `.trees` files)
+- `**Slim.txt`** — Core SLiM script defining population demography, mutation, and selection parameters
+- `**env_sim312.yml*`* — Conda environment specification for simulations
 
 This module reproduces **[Dilber & Terhorst's** genome-scan framework](https://github.com/jthlab/bim-paper/tree/main) and computes tree-based statistics (e.g., `bsfs`, `TajD`, `btree`, `iColless`) to visualize local deviations under selection.
 
@@ -117,8 +117,8 @@ Contains R Markdown scripts for F-matrix analysis:
 
 - `**load_and_store_data.Rmd`** — Load Newick tree files, calculate F/FW-matrices for each genealogy, compute weighted averages, and estimate empirical mean matrices. Saves results to `data/` folder
 - `**load_and_store_data_utils.R`** — Utility functions for data loading and processing
-- `**chromosome_wide_Fmat_analysis.Rmd**` — Compute distance of averaged F-matrices to empirical mean, compare distributions, calculate ROC_AUC scores. Results stored in `roc/` folder
-- `**chromosome_wide_FWmat_analysis.Rmd**` — Compute distance of averaged FW-matrices to empirical mean, compare distributions, calculate ROC_AUC scores. Results stored in `roc/` folder
+- `**chromosome_wide_Fmat_analysis.Rmd`** — Compute distance of averaged F-matrices to empirical mean, compare distributions, calculate ROC_AUC scores. Results stored in `roc/` folder
+- `**chromosome_wide_FWmat_analysis.Rmd`** — Compute distance of averaged FW-matrices to empirical mean, compare distributions, calculate ROC_AUC scores. Results stored in `roc/` folder
 
 ---
 
